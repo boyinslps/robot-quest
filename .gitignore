@@ -1,0 +1,7 @@
+# 本機開發設定（預覽伺服器路徑等）
+.claude/
+
+# 系統檔
+Thumbs.db
+.DS_Store
+private/

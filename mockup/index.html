@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="author" content="資訊老師黃博胤">
+<title>機器人闖關</title>
+<link rel="stylesheet" href="css/style.css">
+<!-- mockup 階段先用 CDN；正式版會打包進本機檔案，斷網也能用 -->
+<script src="https://cdn.jsdelivr.net/npm/blockly@11.2.1/blockly_compressed.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/blockly@11.2.1/msg/zh-hant.js"></script>
+</head>
+<body>
+
+<!-- 登入 -->
+<div id="screen-login" class="screen center-screen">
+  <form id="login-form" class="panel" autocomplete="off">
+    <h1 class="with-icon"><span data-icon="robot" data-size="40"></span>機器人闖關</h1>
+    <label>年級
+      <select name="grade" required>
+        <option value="5">五年級</option>
+        <option value="6">六年級</option>
+      </select>
+    </label>
+    <label>班級 <input name="class" required placeholder="例如 501" maxlength="6"></label>
+    <label>座號 <input name="seat" type="number" min="1" max="60" required></label>
+    <div id="login-err" class="err"></div>
+    <button type="submit" class="big">下一步</button>
+  </form>
+</div>
+
+<!-- 背景調查（登入後、說明前；不計分，老師看得到） -->
+<div id="screen-survey" class="screen center-screen" hidden>
+  <form id="survey-form" class="panel wide survey" autocomplete="off">
+    <h1>先回答兩個小問題</h1>
+    <p class="lead muted-lead">這不會影響闖關，老師只是想知道你學過什麼。</p>
+
+    <div class="q">
+      <div class="q-title">1. 你有玩過<b>積木式程式</b>嗎？<span class="q-eg">例如 Scratch、Blockly（Code.org）、樂高 LEGO（SPIKE、WeDo、Mindstorms）、mBlock</span></div>
+      <div class="choices" data-q="experience">
+        <button type="button" class="choice" data-v="yes">有，玩過</button>
+        <button type="button" class="choice" data-v="no">沒有，這是第一次</button>
+      </div>
+    </div>
+
+    <div class="q" id="q-tools" hidden>
+      <div class="q-title">2. 你用過哪些？<span class="q-eg">可以選很多個</span></div>
+      <div class="choices multi" data-q="tools">
+        <button type="button" class="choice" data-v="Scratch">Scratch</button>
+        <button type="button" class="choice" data-v="Blockly">Blockly／Code.org</button>
+        <button type="button" class="choice" data-v="LEGO">樂高 LEGO</button>
+        <button type="button" class="choice" data-v="mBlock">mBlock</button>
+        <button type="button" class="choice" data-v="other">其他積木程式</button>
+      </div>
+    </div>
+
+    <div class="q" id="q-level" hidden>
+      <div class="q-title">3. 你覺得自己<b>對積木程式熟不熟</b>？</div>
+      <div class="choices levels" data-q="level">
+        <button type="button" class="choice" data-v="1"><b>1</b>只在電腦課接觸過</button>
+        <button type="button" class="choice" data-v="2"><b>2</b>有點會</button>
+        <button type="button" class="choice" data-v="3"><b>3</b>普通</button>
+        <button type="button" class="choice" data-v="4"><b>4</b>很熟</button>
+        <button type="button" class="choice" data-v="5"><b>5</b>非常熟</button>
+      </div>
+    </div>
+
+    <div id="survey-err" class="err"></div>
+    <button type="submit" id="btn-survey" class="big" disabled>下一步</button>
+  </form>
+</div>
+
+<!-- 說明（開始前；闖關中按「說明」會再看到同一份內容） -->
+<div id="screen-intro" class="screen center-screen" hidden>
+  <div class="panel wide">
+    <div id="intro-content">
+      <h1>怎麼玩？</h1>
+      <p class="lead">用積木寫程式，指揮機器人走到終點 <span data-icon="flag" data-size="26"></span></p>
+      <div class="steps">
+        <div class="step"><div class="step-n">1</div><div>從左邊把積木<b>拖進「機器人程式」</b>裡面</div></div>
+        <div class="step"><div class="step-n">2</div><div>按「<b>執行</b>」，看機器人照你的程式動</div></div>
+        <div class="step"><div class="step-n">3</div><div>沒成功就<b>修改再試</b>，機器人會自己回到起點</div></div>
+        <div class="step"><div class="step-n">4</div><div>「<b>一步一步走</b>」每按一次只做一個動作，「<b>上一步</b>」可以往回看</div></div>
+      </div>
+      <ul class="notes">
+        <li>機器人的<b>左右，是以機器人自己為準</b>，看它的黃色箭頭。</li>
+        <li>關卡會越來越難，<b>做不完沒關係</b>，盡力就好。</li>
+        <li>卡住太久可以按「跳過這關」，但跳過就不能回來了。</li>
+        <li><b>暖身不計時</b>。進入第 1 關才開始倒數，共 <span class="total-min">10</span> 分鐘，剩餘時間和目前關卡都會顯示在右上角。</li>
+        <li>出現新的積木時，會先跳出說明。忘記怎麼玩，可以按上方的「說明」。</li>
+      </ul>
+    </div>
+    <button id="btn-begin" class="big">開始闖關</button>
+  </div>
+</div>
+
+<!-- 闖關 -->
+<div id="screen-game" class="screen" hidden>
+  <header id="topbar">
+    <div class="tb-left">
+      <div id="tb-title" class="tb-level"></div>
+      <div id="tb-prompt" class="tb-prompt"></div>
+    </div>
+    <div class="tb-tools">
+      <button id="btn-help" class="tb-btn" data-icon="help">說明</button>
+      <button id="btn-hint" class="tb-btn" data-icon="bulb">提示</button>
+      <button id="btn-skip" class="tb-btn" data-icon="skip" hidden>跳過這關</button>
+      <button id="btn-submit" class="tb-btn submit" data-icon="send" hidden>交出程式</button>
+    </div>
+    <div class="tb-right">
+      <div id="tb-badge" class="tb-badge"></div>
+      <div class="tb-time">
+        <div class="tb-time-row"><span id="tb-clock-label">暖身不計時</span><b id="tb-clock">10:00</b></div>
+        <div class="tb-bar"><div id="tb-bar-fill"></div></div>
+      </div>
+    </div>
+  </header>
+  <div id="hint-bubble" hidden></div>
+  <main>
+    <section id="work">
+      <div id="blockly"></div>
+      <div id="ws-bar">
+        <button id="btn-undo" class="ws-btn" data-icon="undo" data-size="20" title="復原">復原</button>
+        <button id="btn-redo" class="ws-btn" data-icon="redo" data-size="20" title="重做">重做</button>
+        <div id="block-count"></div>
+      </div>
+      <div id="limit-msg" hidden></div>
+      <div id="turn-guide" hidden></div>
+    </section>
+    <section id="stage">
+      <div id="thumbs"></div>
+      <div id="map-label"></div>
+      <div id="map"></div>
+      <div id="status" class="status"></div>
+      <div id="controls">
+        <button id="btn-run" class="ctl primary" data-icon="play">執行</button>
+        <button id="btn-back" class="ctl" data-icon="stepBack" disabled>上一步</button>
+        <button id="btn-step" class="ctl" data-icon="stepFwd">一步一步走</button>
+        <button id="btn-reset" class="ctl" data-icon="reset">重置</button>
+        <button id="btn-speed" class="ctl small" title="切換動畫速度">慢速</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- 結束 -->
+<div id="screen-done" class="screen center-screen" hidden>
+  <div class="panel">
+    <div class="done-icon" data-icon="star" data-size="72"></div>
+    <h1 class="done-title">完成了！謝謝你</h1>
+    <p id="done-note" class="lead"></p>
+    <p id="cloud-status" class="muted" hidden></p>
+    <button id="btn-retry" class="linkish" hidden>再傳一次</button>
+    <div class="teacher-only">
+      <button id="btn-download" class="linkish">下載結果檔（老師用）</button>
+    </div>
+  </div>
+</div>
+
+<!-- 說明卡 -->
+<div id="card" class="modal" hidden>
+  <div class="card-box">
+    <h2 class="card-title"></h2>
+    <div class="card-body"></div>
+    <div class="card-extra"></div>
+    <div class="card-actions"><button class="card-ok big">我知道了</button></div>
+  </div>
+</div>
+
+<!-- 闖關中再看一次說明（時間不會停） -->
+<div id="help" class="modal" hidden>
+  <div class="card-box wide">
+    <div id="help-body"></div>
+    <p class="muted">看說明時，時間還是會繼續算。</p>
+    <div class="card-actions"><button id="btn-help-close" class="big">回到關卡</button></div>
+  </div>
+</div>
+
+<!-- 過關／確認／時間到 -->
+<div id="overlay" class="modal" hidden>
+  <div class="ov-box">
+    <h2 id="ov-title"></h2>
+    <div id="ov-body"></div>
+    <div id="ov-actions"></div>
+  </div>
+</div>
+
+<div id="credit">made by 資訊老師黃博胤</div>
+<div id="hand" hidden></div>
+<div id="dev" hidden></div>
+
+<script src="../shared/firebase-config.js"></script>
+<script src="../shared/cloud.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/levels.js"></script>
+<script src="js/blocks.js"></script>
+<script src="js/mapview.js"></script>
+<script src="js/cards.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

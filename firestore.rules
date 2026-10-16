@@ -1,0 +1,61 @@
+rules_version = '2';
+
+// 機器人闖關：Firestore 安全規則
+//
+// 學生端（匿名登入）：只能「新增」自己的那一筆成績，之後只能更新自己（uid 相同）的那一筆，看不到別人的。
+// 教師後台：只有下面 isTeacher() 列出的 Google 帳號可以讀取、批改、刪除。
+//
+// 使用前請把 teacherEmails 換成老師自己的 Gmail（可以放多個）。
+// 貼到：Firebase 主控台 → Firestore Database → 規則 → 發布。
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function teacherEmails() {
+      return ['TEACHER_EMAIL@gmail.com'];
+    }
+    function isTeacher() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in teacherEmails();
+    }
+    function isStudent() {
+      return request.auth != null && request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+    // 學生端送上來的欄位（多餘的欄位一律拒絕）
+    function validSubmission() {
+      let d = request.resource.data;
+      return d.keys().hasOnly([
+          'uid', 'docId', 'updatedAt', 'status', 'sessionCode', 'student', 'variantSeed',
+          'startedAt', 'finishedAt', 'levels', 'programs', 'events', 'eventsTruncated', 'survey',
+          'clientInfo', 'appVersion'
+        ])
+        && d.uid == request.auth.uid
+        && d.status in ['playing', 'done']
+        && d.levels is list && d.levels.size() <= 12
+        && d.student is map;
+    }
+
+    match /submissions/{id} {
+      allow read, delete: if isTeacher();
+      allow create: if isStudent() && validSubmission();
+      allow update: if (isStudent() && resource.data.uid == request.auth.uid && validSubmission())
+                    || isTeacher();
+    }
+
+    // 程式關：老師的加減分與備註（學生完全碰不到）
+    match /reviews/{id} {
+      allow read, write: if isTeacher();
+    }
+
+    // 每位學生的組裝、面試分數（老師手動輸入）與最後決定（學生完全碰不到）
+    match /scores/{id} {
+      allow read, write: if isTeacher();
+    }
+
+    // 三關權重、組裝／面試的評分項目
+    match /config/{id} {
+      allow read, write: if isTeacher();
+    }
+  }
+}

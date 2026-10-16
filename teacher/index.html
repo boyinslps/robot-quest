@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="author" content="資訊老師黃博胤">
+<meta name="robots" content="noindex">
+<title>機器人校隊選拔：教師後台</title>
+<link rel="stylesheet" href="teacher.css">
+</head>
+<body>
+
+<header id="top">
+  <h1>機器人校隊選拔・教師後台</h1>
+  <div id="mode-badge" class="badge"></div>
+  <div class="spacer"></div>
+  <span id="user-name" class="muted"></span>
+  <button id="btn-login" hidden>用 Google 登入</button>
+  <button id="btn-logout" hidden>登出</button>
+</header>
+
+<div id="notice" hidden></div>
+
+<main id="app">
+  <!-- 各關統計（依目前的分頁變化） -->
+  <section id="stats"></section>
+
+  <!-- 切換：總覽（三關）／單一關卡 -->
+  <nav id="tabs">
+    <button data-view="overview" class="on">總覽</button>
+    <button data-view="assembly">組裝</button>
+    <button data-view="program">程式</button>
+    <button data-view="interview">面試</button>
+    <button data-view="rubric">評分標準</button>
+  </nav>
+
+  <!-- 篩選（總覽與各關共用） -->
+  <div class="toolbar" id="filters">
+    <label>場次 <select id="f-session"></select></label>
+    <label>班級 <select id="f-class"></select></label>
+    <label>搜尋 <input id="f-q" placeholder="班級或座號" size="10"></label>
+    <label id="f-bg-wrap">積木經驗
+      <select id="f-bg">
+        <option value="">全部</option>
+        <option value="potential">★ 潛力股（新手但上手快）</option>
+        <option value="novice">沒接觸過／只在電腦課接觸過</option>
+        <option value="exp">有經驗</option>
+        <option value="none">未填</option>
+      </select>
+    </label>
+    <label id="f-pick-wrap">預計錄取 <input id="f-pick" type="number" min="0" max="200" value="0" style="width:64px"> 人</label>
+    <span class="muted" id="f-hint"></span>
+  </div>
+
+  <section id="view"></section>
+  <input id="file-import" type="file" accept=".json,application/json" multiple hidden>
+</main>
+
+<!-- 個人報告 -->
+<aside id="drawer" hidden>
+  <div id="drawer-inner"></div>
+</aside>
+<div id="shade" hidden></div>
+
+<footer id="credit">made by 資訊老師黃博胤</footer>
+
+<script src="../shared/firebase-config.js"></script>
+<script src="../shared/scoring.js"></script>
+<script src="store.js"></script>
+<script src="dashboard.js"></script>
+</body>
+</html>
