@@ -5,3 +5,7 @@
 Thumbs.db
 .DS_Store
 private/
+
+# 實體積木組裝關：說明書圖片來自 WRO 官方 Building Instructions，不要公開放在網路上（規格書 §15）
+mockup/assets/
+lego quest/

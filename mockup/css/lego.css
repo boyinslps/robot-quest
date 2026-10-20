@@ -1,0 +1,130 @@
+/* Lego Quest（實體積木組裝關）：1366×768 不得出現橫向捲軸；文字 ≥ 16px、按鈕高度 ≥ 48px */
+
+.login-flow { margin: -6px 0 10px; font-size: 17px; }
+#credit { pointer-events: auto; cursor: default; } /* 連續點 5 下 = 老師面板 */
+
+.asm { display: flex; flex-direction: column; background: var(--bg); }
+.asm-btn {
+  min-height: 56px; padding: 0 28px; font-size: 22px; font-weight: bold; border-radius: 12px;
+  border: 2px solid var(--ink); background: #fff; color: var(--ink); display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+}
+.asm-btn:hover:not(:disabled) { background: #f4f1ea; }
+.asm-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; min-width: 220px; }
+.asm-btn.primary:hover:not(:disabled) { background: var(--accent-dark); }
+.asm-btn.danger { border-color: var(--ng); color: var(--ng); }
+.asm-btn:disabled { opacity: 0.45; cursor: default; }
+
+/* ---------- 清點頁 ---------- */
+.asm-count { padding: 12px 24px 14px; gap: 10px; }
+.asm-head h1 { margin: 0; font-size: 30px; }
+.asm-sub { display: flex; justify-content: space-between; align-items: baseline; font-size: 18px; color: #6d675b; font-weight: bold; }
+.asm-progress { color: var(--accent); font-size: 20px; }
+
+.asm-cards { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(2, 1fr); gap: 14px; }
+.asm-card {
+  position: relative; display: flex; flex-direction: column; align-items: center; min-height: 0;
+  background: var(--panel); border: 3px solid #cfc8b8; border-radius: 14px; padding: 10px 10px 10px;
+}
+.asm-card.on { border-color: var(--ok); background: #f1f8ee; }
+.asm-badge {
+  position: absolute; top: 8px; left: 8px; width: 46px; height: 46px; border-radius: 50%;
+  background: var(--ink); color: #fff; font-size: 28px; font-weight: bold; display: flex; align-items: center; justify-content: center;
+}
+.asm-icon { flex: 1; min-height: 0; width: 100%; display: flex; align-items: center; justify-content: center; }
+.asm-icon img { max-width: 78%; max-height: 100%; object-fit: contain; }
+.asm-qty { font-size: 38px; font-weight: bold; line-height: 1.1; }
+.asm-name { font-size: 20px; font-weight: bold; }
+.asm-no { font-size: 15px; color: #7a7466; margin-bottom: 6px; }
+.asm-check {
+  width: 100%; min-height: 48px; border-radius: 10px; border: 2px solid var(--accent); background: #fff; color: var(--accent-dark);
+  font-size: 18px; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.asm-check:hover { background: #eef6f2; }
+.asm-card.on .asm-check { background: var(--ok); border-color: var(--ok); color: #fff; }
+.asm-ck { display: inline-flex; }
+
+.asm-foot { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.asm-mask {
+  position: absolute; inset: 0; z-index: 40; background: rgba(35, 48, 44, 0.72); display: flex; align-items: center; justify-content: center; text-align: center; color: #fff;
+}
+.asm-mask div { display: flex; flex-direction: column; gap: 10px; }
+.asm-mask b { font-size: 40px; }
+.asm-mask span { font-size: 26px; }
+
+/* 缺件回報視窗 */
+.asm-wide { width: min(820px, 100%) !important; text-align: left; }
+.asm-modal-body h2 { margin: 0 0 6px; font-size: 26px; }
+.asm-modal-actions { display: flex; gap: 12px; justify-content: center; margin-top: 14px; flex-wrap: wrap; }
+.asm-modal-actions button { min-height: 52px; padding: 0 22px; font-size: 20px; font-weight: bold; border-radius: 12px; border: 2px solid var(--ink); background: #fff; }
+.asm-modal-actions button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.asm-sr-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; margin-top: 8px; }
+.asm-sr { display: flex; align-items: center; gap: 8px; border: 2px solid #d6d0c2; border-radius: 10px; padding: 6px 8px; background: #fff; }
+.asm-sr.on { border-color: var(--ng); background: #fdf1ef; }
+.asm-sr-b { width: 32px; height: 32px; border-radius: 50%; background: var(--ink); color: #fff; font-weight: bold; display: flex; align-items: center; justify-content: center; flex: none; }
+.asm-sr img { width: 52px; height: 36px; object-fit: contain; flex: none; }
+.asm-sr-n { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 16px; line-height: 1.3; }
+.asm-sr-n span { color: #7a7466; font-size: 14px; }
+.asm-sr-c { display: flex; align-items: center; gap: 6px; flex: none; }
+.asm-sr-v { min-width: 24px; text-align: center; font-size: 22px; }
+.asm-pm { width: 44px; height: 44px; border-radius: 10px; border: 2px solid var(--ink); background: #fff; font-size: 24px; font-weight: bold; padding: 0; }
+.asm-pin { width: 100%; font-size: 26px; padding: 8px 12px; border: 2px solid #bdb5a3; border-radius: 10px; margin-top: 6px; text-align: center; letter-spacing: 6px; user-select: text; }
+
+/* ---------- 倒數 ---------- */
+.asm-countdown { position: fixed; inset: 0; z-index: 120; background: rgba(35, 48, 44, 0.85); display: flex; align-items: center; justify-content: center; }
+.asm-countdown b { font-size: 220px; color: #fff; font-weight: bold; animation: asm-pop 1s ease-out infinite; }
+@keyframes asm-pop { 0% { transform: scale(0.6); opacity: 0.2; } 30% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+
+/* ---------- 組裝頁 ---------- */
+.asm-build { padding: 0; }
+.asm-bar { height: 64px; flex: none; display: flex; align-items: center; gap: 16px; padding: 0 16px; background: var(--ink); color: #fff; }
+.asm-bar-l { display: flex; align-items: baseline; gap: 14px; min-width: 240px; }
+.asm-bar-l b { font-size: 24px; }
+.asm-stepno { font-size: 20px; color: #d3e4dc; font-weight: bold; }
+.asm-bar-m { flex: 1; display: flex; align-items: center; gap: 12px; }
+.asm-time { flex: 1; height: 14px; background: rgba(255, 255, 255, 0.22); border-radius: 7px; overflow: hidden; }
+#asm-time-fill { height: 100%; width: 100%; background: var(--gold); transition: width 0.25s linear; }
+.asm-time.low #asm-time-fill { background: #e8873a; }
+.asm-time-txt { font-size: 22px; font-weight: bold; font-variant-numeric: tabular-nums; min-width: 60px; }
+.asm-bar-r { display: flex; gap: 10px; }
+.asm-tbtn {
+  min-height: 48px; padding: 0 16px; font-size: 18px; font-weight: bold; border-radius: 10px; border: 2px solid #8fa89f; background: transparent; color: #fff;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.asm-tbtn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.12); }
+.asm-tbtn:disabled { opacity: 0.6; }
+
+.asm-stage { flex: 1; min-height: 0; display: flex; align-items: stretch; gap: 8px; padding: 8px 10px; background: #fff; }
+.asm-page { flex: 1; min-width: 0; min-height: 0; display: flex; align-items: center; justify-content: center; }
+.asm-page img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+.asm-nav {
+  width: 92px; flex: none; align-self: center; height: 200px; border-radius: 16px; border: 3px solid var(--accent); background: #eef6f2; color: var(--accent-dark);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font-size: 18px; padding: 0;
+}
+.asm-nav:hover:not(:disabled) { background: #d9ece4; }
+.asm-nav:disabled { opacity: 0.3; cursor: default; }
+.asm-nav-prev svg { transform: scaleX(-1); }
+.asm-bottom { height: 72px; flex: none; display: flex; align-items: center; justify-content: center; background: var(--bg); border-top: 2px solid #d6d0c2; }
+
+.asm-zoomov { position: absolute; inset: 0; z-index: 60; background: #fff; display: flex; flex-direction: column; }
+.asm-zoombar { height: 64px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; background: var(--ink); color: #fff; font-size: 22px; }
+.asm-zoombody { flex: 1; min-height: 0; overflow: auto; background: #fff; }
+.asm-zoombody img { display: block; width: 1600px; max-width: none; margin: 0 auto; }
+
+/* ---------- 完成頁、錯誤頁 ---------- */
+.asm-done { text-align: center; width: min(620px, 100%); }
+.asm-done .done-icon { color: var(--ok); }
+.asm-who-big { font-size: 44px; font-weight: bold; margin: 8px 0 14px; color: var(--accent-dark); }
+.asm-error { width: min(720px, 100%); }
+.asm-error h1 { color: var(--ng); }
+.asm-err-i { background: #fdf1ef; border: 2px solid #e6b8b0; border-radius: 10px; padding: 8px 12px; margin: 6px 0; font-size: 18px; }
+
+/* ---------- 考試說明（最開頭） ---------- */
+.rules { width: min(860px, 100%); }
+.rules h1 { margin: 0 0 12px; font-size: 34px; }
+.rules-list { font-size: 21px; line-height: 1.75; padding-left: 30px; margin: 0 0 14px; }
+.rules-list li { margin-bottom: 6px; }
+.rules-ack { display: flex; align-items: center; gap: 14px; font-size: 22px; font-weight: bold; padding: 12px 16px; margin: 6px 0 4px; border: 3px solid var(--accent); border-radius: 12px; background: #eef6f2; cursor: pointer; }
+.rules-ack input { width: 30px; height: 30px; flex: none; accent-color: var(--accent); }
+/* 圖片的白底融進卡片 */
+.asm-icon img, .asm-sr img { mix-blend-mode: multiply; }
+.panel .rules-ack { justify-content: flex-start; }

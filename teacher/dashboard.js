@@ -8,6 +8,7 @@
   'use strict';
 
   const SC = window.RQ.Scoring;
+  const AS = window.RQ.AssemblyScoring;
   const T = window.RQT;
 
   const $ = (id) => document.getElementById(id);
@@ -285,6 +286,7 @@
   }
 
   function manualHtml(st) {
+    if (st === 'assembly') return assemblyHtml();
     const items = T.config.items[st];
     const cols = manualCols(st);
     const list = sortList(visible(state.people), cols, state.sort[st]);
@@ -321,6 +323,128 @@
       ${list.length ? '' : `<p class="muted pad">${state.people.length ? '沒有符合篩選條件的資料。' : `還沒有學生。請在上面「新增學生」輸入班級與座號（座號可寫 1-30 一次加入整班）。`}</p>`}`;
   }
 
+  // ---------- 組裝（Lego Quest）：老師檢查作品後只要勾選等級，分數由 shared/assembly-scoring.js 決定 ----------
+
+  const legoOf = (p) => (p.program && p.program.sub && p.program.sub.assembly) || null;
+  const durMs = (a) => (a && a.build && typeof a.build.durationMs === 'number' ? a.build.durationMs : null);
+
+  /** 學生的 Lego Quest 狀態（學生端每次改變就上傳，所以是接近即時的） */
+  function legoStatus(a) {
+    if (!a) return { text: '—', cls: 'muted' };
+    if (a.skipped) return { text: '跳過', cls: 'muted' };
+    switch (a.phase) {
+      case 'count': case 'ready': return { text: '清點中', cls: 'live' };
+      case 'shortage_pending': return { text: '缺件待處理', cls: 'ng' };
+      case 'countdown': return { text: '倒數中', cls: 'live' };
+      case 'building': return { text: '組裝中', cls: 'live' };
+      default: return a.build && a.build.timedOut ? { text: '逾時，待檢查', cls: 'ng' } : { text: '已完成，待檢查', cls: 'ok' };
+    }
+  }
+
+  const ASM_COLS = [
+    { key: 'rank', label: '名次', num: true, val: (p) => p.rk.assembly || null },
+    { key: 'cls', label: '班級', val: (p) => p.cls },
+    { key: 'seat', label: '座號', num: true, val: (p) => p.seat },
+    { key: 'lego', label: 'Lego 狀態', val: (p) => legoStatus(legoOf(p)).text },
+    { key: 'dur', label: '組裝用時', num: true, val: (p) => durMs(legoOf(p)) },
+    { key: 'grade', label: '檢查結果（勾選）', val: (p) => p.s.assembly },
+    { key: 'score', label: '分數', num: true, val: (p) => p.s.assembly },
+    { key: 'note', label: '備註', val: (p) => (p.doc && p.doc.assembly && p.doc.assembly.note) || null },
+    { key: 'at', label: '最後更新', val: (p) => (p.doc && p.doc.assembly && p.doc.assembly.at) || null },
+  ];
+
+  /** 檢查結果的下拉選單。手動輸入過分數（沒有等級）的舊資料，顯示成「手動 N 分」 */
+  function gradeSelect(rec, dis) {
+    const cur = rec && rec.grade;
+    const legacy = rec && !cur && typeof rec.score === 'number';
+    return `<select class="grade-sel" ${dis}>
+      <option value="">（未檢查）</option>
+      ${AS.GRADES.map((g) => `<option value="${g.key}" ${cur === g.key ? 'selected' : ''}>${esc(g.label)}（${g.score}）</option>`).join('')}
+      ${legacy ? `<option value="__legacy" selected disabled>手動輸入 ${fmt(rec.score)} 分</option>` : ''}
+    </select>`;
+  }
+
+  /** 缺件待處理的同學：老師到學生旁邊用「老師面板」（Ctrl+Shift+L）處理 */
+  function asmAlerts(list) {
+    const rows = list.filter((p) => { const a = legoOf(p); return a && a.phase === 'shortage_pending'; }).map((p) => {
+      const rs = legoOf(p).count.shortageReports;
+      const last = rs[rs.length - 1];
+      return `<b>${esc(p.cls)} 班 ${p.seat} 號</b>（${last.items.map((i) => `${esc(i.bag)} 袋缺 ${i.short} 顆`).join('、')}）`;
+    });
+    return rows.length ? `<div class="asm-alert"><b>缺件待處理：</b>${rows.join('；')}。請到該同學的電腦按 Ctrl+Shift+L 輸入老師密碼，選「已補件」或「沒有缺件（誤報）」。</div>` : '';
+  }
+
+  function assemblyHtml() {
+    const st = 'assembly';
+    const list = sortList(visible(state.people), ASM_COLS, state.sort[st]);
+    const editable = T.canEdit();
+    const dis = editable ? '' : 'disabled';
+    const body = list.map((p) => {
+      const rec = (p.doc && p.doc[st]) || {};
+      const a = legoOf(p);
+      const ls = legoStatus(a);
+      const at = rec.at ? `${new Date(rec.at).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} ${esc(String(rec.by || '').split('@')[0])}` : '';
+      return `<tr data-key="${esc(p.key)}" data-st="${st}"><td class="num">${p.rk[st] || '—'}</td><td class="link" data-open="${esc(p.key)}" data-sec="assembly">${esc(p.cls)}</td><td class="num link" data-open="${esc(p.key)}" data-sec="assembly">${p.seat}</td>
+        <td><span class="${ls.cls}">${esc(ls.text)}</span></td><td class="num">${durMs(a) !== null ? mmss(durMs(a)) : ''}</td>
+        <td>${gradeSelect(rec, dis)}</td><td class="num total score-cell">${fmt(p.s[st])}</td>
+        <td><input class="note-in" type="text" maxlength="200" value="${esc(rec.note || '')}" ${dis}></td><td class="muted">${at}</td></tr>`;
+    }).join('');
+    const legend = AS.GRADES.map((g) => `<b>${esc(g.label)}</b> ${g.score} 分（${esc(g.hint)}）`).join('　');
+    return `${asmAlerts(list)}<div class="addbar">
+        <b>新增學生</b>
+        <label>班級 <input id="add-cls" size="6" placeholder="501"></label>
+        <label>座號 <input id="add-seat" size="10" placeholder="5　或　1-30"></label>
+        <button data-act="add">加入名單</button>
+        <div class="spacer"></div>
+        <a class="btnlink" href="labels.html" target="_blank">列印袋子標籤</a>
+        <button data-act="csv">匯出 CSV</button>
+      </div>
+      <p class="muted">學生做完 Lego Quest 後，老師檢查作品，在「檢查結果」勾選等級就好，離開欄位自動儲存。${legend}。用時、翻頁與放大次數、缺件回報只給老師參考，不計分。</p>
+      <div class="table-wrap"><table class="entry"><thead>${thead(ASM_COLS, st)}</thead><tbody>${body}</tbody></table></div>
+      ${list.length ? '' : `<p class="muted pad">${state.people.length ? '沒有符合篩選條件的資料。' : '還沒有學生。學生登入後會自動出現，或在上面「新增學生」輸入班級與座號（座號可寫 1-30 一次加入整班）。'}</p>`}`;
+  }
+
+  function saveAssemblyRow(tr, p) {
+    const sel = tr.querySelector('.grade-sel').value;
+    if (sel === '__legacy') return;
+    const g = AS.byKey(sel);
+    const note = tr.querySelector('.note-in').value.trim();
+    const rec = (p.doc && p.doc.assembly) || null;
+    if (rec && (rec.grade || null) === (g ? g.key : null) && (rec.note || '') === note && (rec.grade || !g)) return; // 沒改就不寫入
+    if (!rec && !g && !note) return;
+    guard(T.saveStage(p, 'assembly', { score: g ? g.score : null, grade: g ? g.key : null, items: {}, note }), '已儲存 ✓');
+  }
+
+  /** 個人報告裡的組裝：學生的 Lego Quest 紀錄 + 勾選等級 */
+  function assemblySection(p) {
+    const a = legoOf(p);
+    const rec = (p.doc && p.doc.assembly) || {};
+    const dis = T.canEdit() ? '' : 'disabled';
+    let info = '<p class="muted">沒有 Lego Quest 的紀錄（學生沒做、或不在目前篩選的場次）。仍然可以直接勾選等級。</p>';
+    if (a) {
+      const ls = legoStatus(a);
+      const b = a.build;
+      const reports = (a.count && a.count.shortageReports) || [];
+      const rText = reports.length
+        ? reports.map((r) => `${r.items.map((i) => `${esc(i.bag)} 袋缺 ${i.short} 顆`).join('、')} → ${r.resolution === 'restocked' ? '已補件' : r.resolution === 'false_alarm' ? '<span class="ng">誤報</span>' : '<span class="ng">待處理</span>'}`).join('；')
+        : '沒有';
+      const seeded = a.count && a.count.seededShortage;
+      const dwell = b && b.stepDwellMs ? b.stepDwellMs.map((ms, i) => `<span class="dw" title="第 ${i + 1} 步">${i + 1}:${Math.round(ms / 1000)}s</span>`).join(' ') : '';
+      const ack = p.program && p.program.sub && p.program.sub.rulesAck;
+      info = `<div class="bgbox"><b>Lego Quest：</b><span class="${ls.cls}">${esc(ls.text)}</span>${a.skipped ? '（老師跳過）' : ''}
+        <div class="muted">考試說明：${ack ? `已確認「理解並能遵守」（${esc(new Date(ack.at).toLocaleTimeString('zh-TW'))}）` : '<span class="ng">沒有確認紀錄</span>'}</div>
+        <div class="muted">清點用時 ${a.count && a.count.durationMs != null ? mmss(a.count.durationMs) : '—'}　缺件回報：${rText}${seeded ? `　<b>被故意少放 ${esc(seeded.bag)} 袋 ${seeded.short} 顆，${seeded.noticed ? '有發現' : '<span class="ng">沒發現</span>'}</b>` : ''}</div>
+        ${b ? `<div class="muted">組裝用時 ${b.durationMs != null ? mmss(b.durationMs) : '進行中'}${b.timedOut ? '（<span class="ng">逾時</span>）' : ''}　結束在第 ${b.finishedAtStep || '—'} 步（最遠到第 ${b.maxStepReached} 步）　上一步 ${b.backNavCount} 次　放大 ${b.zoomCount} 次</div>
+        <div class="muted">各步停留（秒）：${dwell}</div>` : ''}</div>`;
+    }
+    const opts = AS.GRADES.map((g) => `<label class="gopt ${rec.grade === g.key ? 'on' : ''}"><input type="radio" name="asm-grade" value="${g.key}" ${rec.grade === g.key ? 'checked' : ''} ${dis}><b>${esc(g.label)}</b><span>${g.score} 分</span><small>${esc(g.hint)}</small></label>`).join('');
+    const legacy = !rec.grade && typeof rec.score === 'number' ? `<p class="muted">目前是手動輸入的 ${fmt(rec.score)} 分（沒有勾選等級）；勾選等級會取代它。</p>` : '';
+    const at = rec.at ? `最後更新 ${new Date(rec.at).toLocaleString('zh-TW')}（${esc(rec.by || '')}）` : '';
+    return `${info}<div class="gopts" id="asm-gopts">${opts}</div>${legacy}
+      <div class="review mform"><label>備註</label><textarea id="asm-note" class="note-area" ${dis}>${esc(rec.note || '')}</textarea></div>
+      <div class="d-actions"><button class="primary" data-act="save-assembly" ${dis}>儲存組裝檢查結果</button><button data-act="clear-assembly" ${dis}>清除勾選</button><span class="muted">${at}</span></div>`;
+  }
+
   /** 把表單的原始輸入算成分數。vals 對應評分項目（沒有項目時只有一格 0–100 分） */
   function computeStage(st, vals) {
     const items = T.config.items[st];
@@ -342,6 +466,7 @@
     const p = state.byKey.get(tr.dataset.key);
     if (!p) return;
     const st = tr.dataset.st;
+    if (st === 'assembly') { saveAssemblyRow(tr, p); return; }
     const vals = [...tr.querySelectorAll('.cell-in')].map((i) => i.value);
     const note = tr.querySelector('.note-in').value.trim();
     const r = computeStage(st, vals);
@@ -446,10 +571,13 @@
       <p>綜合 = 組裝、程式、面試的加權平均，滿分 100。權重為 0 的關卡不列入。三關（權重 &gt; 0）都有分數才排名。</p>
       <p>${wIn} <button class="primary" data-act="save-weights" ${disabled}>儲存權重</button></p>
 
-      <h2>組裝、面試：評分項目（選填）</h2>
+      <h2>組裝（Lego Quest）：老師勾選等級</h2>
+      <p>學生拼完吉他後，老師檢查作品，勾選下面其中一個等級，分數就固定了。用時、翻頁與放大次數、缺件回報只給老師參考，不計分。分數可以在 <code>shared/assembly-scoring.js</code> 的 <code>GRADES</code> 調整。</p>
+      <table><thead><tr><th>等級</th><th class="num">分數</th><th>什麼時候勾</th></tr></thead><tbody>${AS.GRADES.map((g) => `<tr><td><b>${esc(g.label)}</b></td><td class="num">${g.score}</td><td>${esc(g.hint)}</td></tr>`).join('')}</tbody></table>
+
+      <h2>面試：評分項目（選填）</h2>
       <p>預設是直接輸入 0–100 分。想分項評分（例如面試的「表達」「態度」），每行寫「項目名稱,滿分」，總分會自動換算成 100。留空 = 直接輸入分數。改項目不會影響已輸入的總分。</p>
       <div class="items-edit">
-        <div><b>組裝</b><textarea id="items-assembly" rows="5" placeholder="例：結構穩固,30&#10;功能完成,40&#10;時間內完成,30">${esc(itemTxt('assembly'))}</textarea></div>
         <div><b>面試</b><textarea id="items-interview" rows="5" placeholder="例：表達,10&#10;學習態度,10&#10;動機,10">${esc(itemTxt('interview'))}</textarea></div>
       </div>
       <p><button class="primary" data-act="save-items" ${disabled}>儲存評分項目</button></p>
@@ -498,10 +626,11 @@
     return { out, bad };
   }
   function saveItems() {
-    const a = parseItems($('items-assembly').value), b = parseItems($('items-interview').value);
-    if (a.bad.length || b.bad.length) { toast(`格式不對：${a.bad.length ? '組裝 ' + a.bad.join('、') : ''} ${b.bad.length ? '面試 ' + b.bad.join('、') : ''}（要寫「名稱,滿分」）`, true); return; }
+    // 組裝改成老師勾選等級，不再有評分項目；原本的設定原樣保留
+    const a = { out: T.config.items.assembly || [], bad: [] }, b = parseItems($('items-interview').value);
+    if (b.bad.length) { toast(`格式不對：面試 ${b.bad.join('、')}（要寫「名稱,滿分」）`, true); return; }
     const dup = (arr) => new Set(arr.map((i) => i.name)).size !== arr.length;
-    if (dup(a.out) || dup(b.out)) { toast('同一關的項目名稱不能重複', true); return; }
+    if (dup(b.out)) { toast('項目名稱不能重複', true); return; }
     guard(T.saveConfig({ ...T.config, items: { assembly: a.out, interview: b.out } }), '評分項目已儲存 ✓');
   }
 
@@ -604,7 +733,7 @@
       <div class="d-head" style="margin-top:12px"><label>最後決定
         <select id="d-decision" ${dis}><option value="">（未決定）</option><option value="pick">入選</option><option value="wait">候補</option><option value="drop">不錄取</option></select></label></div>
 
-      <div class="sec" id="sec-assembly"><h3>組裝</h3>${manualForm(p, 'assembly')}</div>
+      <div class="sec" id="sec-assembly"><h3>組裝（Lego Quest）</h3>${assemblySection(p)}</div>
       <div class="sec" id="sec-program"><h3>程式（自動評分）</h3>${programSection(p)}</div>
       <div class="sec" id="sec-interview"><h3>面試</h3>${manualForm(p, 'interview')}</div>
 
@@ -647,6 +776,16 @@
         return [sub.sessionCode, sub.student.grade, p.cls, p.seat, sub.variantSeed, r.done ? '完成' : '進行中', p.rk.program, s.cleared, s.reached, s.dims.A, s.dims.B, s.dims.C, s.dims.D, s.dims.E, s.adjust, s.total, s.grade, s.pick, (r.review && r.review.note) || '', s.surveyText, s.potential.tier ? s.potential.label : '']
           .concat(s.levels.map((l) => (l.cleared ? l.stars : l.visited ? '未過' : '未玩')), s.skills.map((k) => k.pct));
       })));
+    } else if (v === 'assembly') {
+      const list = sortList(visible(state.people), ASM_COLS, state.sort[v]);
+      downloadCsv('機器人校隊選拔_組裝.csv', [['班級', '座號', 'Lego狀態', '組裝用時(秒)', '逾時', '結束在第幾步', '上一步次數', '放大次數', '缺件回報次數', '檢查結果', '分數', '名次', '備註', '評分者']]
+        .concat(list.map((p) => {
+          const rec = (p.doc && p.doc.assembly) || {};
+          const a = legoOf(p);
+          const b = (a && a.build) || {};
+          const g = AS.byKey(rec.grade);
+          return [p.cls, p.seat, legoStatus(a).text, durMs(a) !== null ? Math.round(durMs(a) / 1000) : '', b.timedOut ? '是' : '', b.finishedAtStep || '', b.backNavCount, b.zoomCount, a && a.count ? a.count.shortageReports.length : '', g ? g.label : '', p.s.assembly, p.rk.assembly, rec.note || '', rec.by || ''];
+        })));
     } else if (MANUAL.includes(v)) {
       const items = T.config.items[v];
       const list = sortList(visible(state.people), manualCols(v), state.sort[v]);
@@ -701,7 +840,7 @@
   // 表格裡的輸入：離開欄位自動儲存；Enter 跳到下一位同一欄
   $('view').addEventListener('change', (e) => {
     const tr = e.target.closest('tr[data-st]');
-    if (tr && e.target.matches('.cell-in, .note-in')) saveRow(tr);
+    if (tr && e.target.matches('.cell-in, .note-in, .grade-sel')) saveRow(tr);
   });
   $('view').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && e.target.matches('.cell-in, .note-in')) {
@@ -726,7 +865,14 @@
     if (!b) return;
     const p = state.byKey.get(state.openKey);
     if (!p) return;
-    if (b.dataset.act === 'save-stage') {
+    if (b.dataset.act === 'save-assembly' || b.dataset.act === 'clear-assembly') {
+      const clear = b.dataset.act === 'clear-assembly';
+      const sel = clear ? null : $('drawer').querySelector('input[name="asm-grade"]:checked');
+      const g = sel ? AS.byKey(sel.value) : null;
+      if (!clear && !g && !(p.doc && p.doc.assembly)) { toast('請先勾選一個等級', true); return; }
+      guard(T.saveStage(p, 'assembly', { score: g ? g.score : null, grade: g ? g.key : null, items: {}, note: $('asm-note').value.trim().slice(0, 500) }), clear ? '已清除 ✓' : '已儲存 ✓')
+        .then(() => { document.activeElement.blur(); if (state.openKey) render(true); });
+    } else if (b.dataset.act === 'save-stage') {
       const st = b.dataset.st;
       const form = $('drawer').querySelector(`.mform[data-st="${st}"]`);
       const vals = [...form.querySelectorAll('.cell-in')].map((i) => i.value);

@@ -2,7 +2,7 @@
 
 臺南市勝利國小機器人校隊的選手篩選工具。學生用積木寫程式指揮機器人，系統記錄作答過程。
 
-目前是 **mockup**：前端闖關（程式關）可以完整玩一輪；成績會上傳 Firebase。教師後台涵蓋選拔的三關（組裝、程式、面試）：程式自動評分，組裝與面試由老師輸入分數，並算出綜合成績（設定見 [FIREBASE_SETUP.md](FIREBASE_SETUP.md)）。
+目前是 **mockup**：前端可以完整玩一輪（考試說明 → 登入 → Lego Quest 拼積木 → Robot Quest 積木程式）；成績會上傳 Firebase。教師後台涵蓋選拔的三關（組裝、程式、面試）：程式自動評分，組裝與面試由老師輸入分數，並算出綜合成績（設定見 [FIREBASE_SETUP.md](FIREBASE_SETUP.md)）。
 
 ## 怎麼開
 
@@ -18,7 +18,7 @@ powershell -ExecutionPolicy Bypass -File mockup/serve.ps1 -Port 5173
 
 | 網址 | 用途 |
 |---|---|
-| `index.html` | 學生端：登入 → 背景調查（有沒有玩過積木程式、自評熟悉度）→ 說明 → 闖關 → 完成 |
+| `index.html` | 學生端：考試說明（勾選確認）→ 登入（班級、座號）→ **Lego Quest**（實體積木組裝）→ 按「開始 Robot Quest」→ 背景調查 → 說明 → 闖關 → 完成 |
 | `index.html?dev` | 開發模式：跳過登入，左下角可以跳關、切換 A/B 版、加 5 分鐘；老師電腦上有 `private/answers.js` 時還能「填入解答」 |
 
 ## 關卡
@@ -45,7 +45,7 @@ powershell -ExecutionPolicy Bypass -File mockup/serve.ps1 -Port 5173
 ```
 mockup/
   index.html        學生端頁面
-  css/style.css
+  css/style.css、css/lego.css
   js/icons.js       向量圖示（不使用 emoji）
   js/engine.js      模擬器引擎（純邏輯）：地圖、執行、感測、鏡像、積木數、編輯距離
   js/levels.js      所有關卡的地圖、開放積木、提示（不含參考解）
@@ -53,19 +53,49 @@ mockup/
   js/mapview.js     SVG 地圖與機器人動畫
   js/cards.js       新積木說明卡（含如果…不然 的動畫示範）
   js/app.js         流程、計時、事件紀錄
+  js/lego-model.js  Lego Quest 狀態機與計時（純邏輯）
+  js/lego.js        Lego Quest 畫面、事件紀錄、老師密碼面板
+  js/lego-config.js Lego Quest 設定（放行、時間、老師密碼）
+  assets/guitar/    吉他說明書圖片與零件資料（不進 git，見下方 Lego Quest）
   serve.ps1         本機預覽伺服器（-Root 可指定資料夾，例如整個專案根目錄）
 shared/
   firebase-config.js  Firebase 設定（沒填就不連線）
   cloud.js            學生端上傳（匿名登入、失敗自動重試）
-  scoring.js          評分標準：100 分、5 個面向、6 項能力、等級
+  scoring.js          程式關評分標準：100 分、5 個面向、6 項能力、等級
+  assembly-scoring.js 組裝評分：老師勾選四個等級（100／95／90／80）
 teacher/
   index.html          教師後台（Google 登入）：三關總覽、單一關卡的全部學生與詳細表現、評分標準與設定
   dashboard.js        畫面；store.js 資料層（Firebase／本機）；teacher.css
+  labels.html         Lego Quest 袋子標籤列印頁
 firestore.rules      Firestore 安全規則（學生只能寫自己的、老師才能讀）
 FIREBASE_SETUP.md    Firebase 一次性設定步驟
 DECISIONS.md        設計決定與和原準則不同的地方（公開，不含答案）
-private/            老師專用、不公開（.gitignore）：參考解、關卡與評分的自動驗證、含答案的設計筆記
+private/            老師專用、不公開（.gitignore）：參考解、關卡／評分／Lego Quest 的自動驗證、含答案的設計筆記
+lego quest/         Lego Quest 的規格書、原始 PDF 與壓縮檔（不進 git）
 ```
+
+## Lego Quest（實體積木組裝）
+
+選拔共三關：**組裝（Lego Quest）→ 程式（Robot Quest）→ 面試**。學生拿到一袋真的樂高積木，照網站上的官方說明書把**吉他**拼出來；網站負責清點、計時、翻說明書、記錄，**作品對不對由老師現場檢查**，在後台勾選等級。
+
+**學生怎麼走**：考試說明（勾選「我已經理解並確認能遵守」）→ 輸入班級座號 → 清點 8 袋積木（A–H）→ 老師放行 → 倒數 3、2、1 → 看說明書組裝（12 步）→ 按「完成」→ 把作品交給老師 → 按「**開始 Robot Quest**」才進程式關。面試會在這兩關之間的空檔，由老師叫號到隔壁教室。
+
+**老師要做的事**
+
+1. **圖片資料夾**：`mockup/assets/guitar/`（圖片 1.2 MB）放在這台電腦上。**不要推到公開的 GitHub**（說明書來自 WRO 官方，已在 `.gitignore`）。沒有這個資料夾時，學生端會顯示「Lego Quest 無法開始」，老師用密碼面板可以跳過。
+2. **列印袋子標籤**：開 `teacher/labels.html`，輸入座號範圍（例 1-8）→ 列印。每位學生 8 張（A–H），黑白列印也看得清楚。
+3. **放行**：預設要老師放行，學生才能按「開始組裝」。在學生電腦按 **Ctrl+Shift+L**（或連續點畫面右下角的署名 5 下）→ 輸入老師密碼（預設 `1234`，請換掉，見 `mockup/js/lego-config.js`）→ 選「放行」。不想用放行：網址加 `?gate=0`。
+4. **缺件**：學生按「我的積木有缺」→ 畫面鎖住，後台「組裝」分頁最上面會出現「缺件待處理」→ 到學生旁邊補積木，用同一個密碼面板選「已補件」或「沒有缺件（誤報）」。
+5. **檢查作品**：後台「組裝」分頁，每位學生一列，在「檢查結果」勾選等級（完全正確 100、部分錯誤 95、較多錯誤 90、未完成 80），離開欄位就存好。用時、翻頁、放大次數、缺件回報只給老師參考。
+
+**網址參數**：`?gate=0` 不用放行、`?cap=秒` 組裝時間（預設 720 秒 = 12 分鐘）、`?sec=1` 顯示剩餘秒數、`?lego=0` 不做 Lego Quest（直接 Robot Quest，也不顯示考試說明）。
+
+**要求**：
+- Firestore 規則多了 `assembly`、`rulesAck` 兩個欄位，**要重新貼規則並發布**，否則整筆上傳會被擋（見 [FIREBASE_SETUP.md](FIREBASE_SETUP.md)）。
+- 組裝中重新整理頁面會回到原本的步驟，**計時不會重置也不會多給**。
+- 用公開的 GitHub Pages 開會看不到說明書（圖片不在 repo 裡）；正式施測請用老師電腦或校內網路。
+
+驗證：`private/lego-test.html`（狀態機、計時、還原、計分，55 項）。
 
 ## 新增或修改關卡
 
@@ -82,6 +112,7 @@ private/            老師專用、不公開（.gitignore）：參考解、關�
 - 學生連結加場次代碼：`mockup/index.html?s=1015`，成績依場次分組。
 - 評分標準寫在 `shared/scoring.js`，改了之後所有人立刻用新標準重算；`private/scoring-test.html` 要全部通過。
 - 評分只是**篩選參考**：個人報告可替程式關加減分（±20）、寫備註，並標記最後決定（入選／候補／不錄取）。
+- **組裝**不是輸入分數，是老師勾選四個等級（見上方 Lego Quest）；等級分數在 `shared/assembly-scoring.js` 的 `GRADES`。
 
 ## 還沒做／需要老師決定
 

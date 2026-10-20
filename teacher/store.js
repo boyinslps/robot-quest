@@ -168,6 +168,7 @@
   /** 儲存某位學生某一關（assembly / interview）的分數。data = { score, items, note }；score 為 null 代表清除 */
   T.saveStage = async (person, stage, data) => {
     const rec = { score: data.score, items: data.items || {}, note: data.note || '', by: nowBy(), at: Date.now() };
+    if (data.grade) rec.grade = data.grade; // 組裝：老師勾選的等級（完全正確／部分錯誤／較多錯誤／未完成）
     const base = { class: String(person.cls), seat: Number(person.seat), grade: person.grade ? Number(person.grade) : 0 };
     if (T.useCloud()) {
       const { db, fs } = T.fb;

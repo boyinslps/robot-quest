@@ -93,8 +93,20 @@
   // ---------- 畫面切換 ----------
 
   function show(id) {
-    ['screen-login', 'screen-survey', 'screen-intro', 'screen-game', 'screen-done'].forEach((s) => ($(s).hidden = s !== id));
+    document.querySelectorAll('.screen').forEach((el) => { el.hidden = el.id !== id; });
   }
+
+  // 考試說明（最開頭）：勾選「我已經理解並確認能遵守」才能繼續；確認的時間會跟著成績一起上傳
+  const ACK_KEY = 'rq_ack';
+  const readAck = () => { try { return JSON.parse(sessionStorage.getItem(ACK_KEY) || 'null'); } catch (e) { return null; } };
+  S.rulesAck = readAck();
+  $('rules-ack').onchange = () => { $('rules-go').disabled = !$('rules-ack').checked; };
+  $('rules-go').onclick = () => {
+    if (!$('rules-ack').checked) return;
+    S.rulesAck = { at: new Date().toISOString(), v: 1 };
+    try { sessionStorage.setItem(ACK_KEY, JSON.stringify(S.rulesAck)); } catch (e) { /* 忽略 */ }
+    show('screen-login');
+  };
 
   $('login-form').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -107,8 +119,14 @@
     }
     S.student = { grade: Number(f.get('grade')), class: cls, seat };
     S.variant = seat % 2 === 1 ? 'A' : 'B'; // 相鄰座號拿到鏡像地圖
-    startSurvey();
+    startAfterLogin();
   });
+
+  // 登入後先做 Lego Quest（實體積木組裝）；做完按「開始 Robot Quest」才進背景調查、說明、闖關
+  function startAfterLogin() {
+    if (RQ.lego && RQ.lego.enabled()) RQ.lego.begin(S.student, startSurvey);
+    else startSurvey();
+  }
 
   // ---------- 背景調查：有沒有玩過積木程式、自評熟悉度（不計分，老師後台看得到）----------
 
@@ -745,6 +763,20 @@
     RQ.cloud.upload(docId(), submission(), status).catch((e) => console.warn(e));
   }
 
+  // Lego Quest 用：每次狀態改變就上傳「進行中」（3 秒內合併成一次），老師後台才看得到清點、組裝到哪了
+  RQ.sessionCode = sessionCode;
+  let legoTimer = null;
+  RQ.onLegoChange = () => {
+    if (legoTimer) return;
+    legoTimer = setTimeout(() => { legoTimer = null; syncCloud('playing'); }, 3000);
+  };
+  // 馬上上傳並回報結果（Lego Quest 完成頁用）
+  RQ.syncCloudNow = () => {
+    if (!cloudOn()) return;
+    RQ.cloud.upload(docId(), submission(), 'playing').catch(() => {}).then(() => RQ.cloud.flush(true));
+  };
+  setInterval(() => { if (RQ.lego && RQ.lego.active()) RQ.onLegoChange(); }, 30000); // 組裝中每 30 秒回報一次
+
   function uploadFinal() {
     if (!cloudOn()) return;
     const msg = { sending: '成績傳送中…', ok: '成績已送出給老師。', fail: '成績還沒傳成功，請告訴老師。' };
@@ -768,6 +800,8 @@
       student: S.student,
       variantSeed: S.variant,
       survey: S.survey,
+      assembly: RQ.lego ? RQ.lego.result() : undefined, // Lego Quest（實體積木組裝）的結果與事件；沒做就沒有
+      rulesAck: S.rulesAck || undefined, // 學生按下「我已經理解並確認能遵守」的時間
       startedAt: S.startedIso,
       finishedAt: new Date().toISOString(),
       levels: Object.values(S.results),
@@ -900,5 +934,13 @@
     sc.src = '../private/answers.js';
     sc.onload = () => { if (S.level) renderDev(); };
     document.head.appendChild(sc);
+  } else if (RQ.lego && RQ.lego.savedStudent()) {
+    // 重新整理：回到 Lego Quest 原本的畫面（不用重新登入；組裝計時由絕對時間推算，不會重置）
+    S.student = RQ.lego.savedStudent();
+    S.variant = S.student.seat % 2 === 1 ? 'A' : 'B';
+    startAfterLogin();
+  } else if (!(RQ.lego && RQ.lego.enabled()) || S.rulesAck) {
+    // 沒有 Lego Quest 的場次不顯示考試說明；已經確認過（重新整理）就直接進登入
+    show('screen-login');
   }
 })((window.RQ = window.RQ || {}));

@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="author" content="資訊老師黃博胤">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>袋子標籤列印（Lego Quest）</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Microsoft JhengHei", "Noto Sans TC", sans-serif; color: #111; background: #f3efe6; }
+  .ctl { padding: 14px 20px; background: #fff; border-bottom: 2px solid #ccc; display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+  .ctl label { font-weight: bold; }
+  .ctl input { font-size: 16px; padding: 4px 8px; width: 120px; }
+  .ctl button { font-size: 16px; padding: 6px 16px; border: 2px solid #23302c; background: #2f7a67; color: #fff; border-radius: 8px; cursor: pointer; }
+  .ctl .hint { color: #666; font-size: 14px; }
+  #err { color: #b3261e; padding: 12px 20px; font-weight: bold; }
+  .page { width: 210mm; margin: 12px auto; background: #fff; padding: 8mm; display: grid; grid-template-columns: repeat(2, 1fr); gap: 4mm; page-break-after: always; box-shadow: 0 2px 8px rgba(0, 0, 0, .15); }
+  /* 黑白列印也要清楚：資訊靠文字、粗框和字母，不靠顏色 */
+  .lab { border: 2.5px solid #000; border-radius: 3mm; padding: 3mm 4mm; display: grid; grid-template-columns: 22mm 1fr; grid-template-rows: auto auto; align-items: center; gap: 1mm 4mm; height: 52mm; }
+  .lab .bag { grid-row: 1 / 3; width: 22mm; height: 22mm; border: 3px solid #000; border-radius: 50%; font-size: 17mm; font-weight: 900; display: flex; align-items: center; justify-content: center; }
+  .lab .who { font-size: 11pt; font-weight: bold; text-align: right; }
+  .lab .main { display: flex; align-items: center; gap: 3mm; }
+  .lab .main img { height: 16mm; max-width: 28mm; object-fit: contain; filter: grayscale(1); }
+  .lab .qty { font-size: 24pt; font-weight: 900; line-height: 1; }
+  .lab .name { font-size: 13pt; font-weight: bold; }
+  .lab .no { font-size: 9pt; color: #333; }
+  .lab .txt { display: flex; flex-direction: column; }
+  .foot { text-align: right; font-size: 9pt; color: #666; padding: 4px 20px 20px; }
+  @media print {
+    body { background: #fff; }
+    .ctl, #err, .foot { display: none; }
+    .page { margin: 0; box-shadow: none; width: auto; padding: 8mm; }
+    @page { size: A4; margin: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="ctl">
+  <label>座號範圍 <input id="seats" value="1-8" placeholder="例：1-8 或 1,3,5"></label>
+  <label>班級（選填，印在標籤上）<input id="cls" placeholder="501"></label>
+  <button id="go" type="button">產生標籤</button>
+  <button id="print" type="button">列印</button>
+  <span class="hint">每位學生 8 張（A–H），每頁 A4 放 10 張。黑白列印也看得清楚。</span>
+</div>
+<div id="err" hidden></div>
+<div id="out"></div>
+<div class="foot">made by 資訊老師黃博胤</div>
+
+<!-- 作品資料（零件清單）；圖示在 ../mockup/assets，沒有圖也能印文字標籤 -->
+<script src="../mockup/assets/guitar/guitar.js" onerror="window.__noObj = true"></script>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const obj = window.RQ && window.RQ.OBJECTS && window.RQ.OBJECTS.guitar;
+  if (!obj) {
+    $('err').hidden = false;
+    $('err').textContent = '找不到作品資料（mockup/assets/guitar/guitar.js）。請確認 assets 資料夾在這台電腦上。';
+    return;
+  }
+  const base = '../mockup/assets/guitar/';
+  const parseSeats = (t) => {
+    const s = new Set();
+    t.split(/[,，、\s]+/).filter(Boolean).forEach((p) => {
+      const m = p.match(/^(\d+)\s*[-~－～]\s*(\d+)$/);
+      if (m) { for (let i = Number(m[1]); i <= Math.min(Number(m[2]), 80); i++) s.add(i); }
+      else if (/^\d+$/.test(p)) s.add(Number(p));
+    });
+    return [...s].sort((a, b) => a - b);
+  };
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  function render() {
+    const seats = parseSeats($('seats').value);
+    const cls = $('cls').value.trim();
+    const labels = [];
+    seats.forEach((seat) => obj.parts.forEach((p) => labels.push({ seat, p })));
+    const pages = [];
+    for (let i = 0; i < labels.length; i += 10) pages.push(labels.slice(i, i + 10));
+    $('out').innerHTML = pages.map((pg) => `<div class="page">${pg.map(({ seat, p }) => `
+      <div class="lab">
+        <div class="bag">${esc(p.bag)}</div>
+        <div class="who">${cls ? esc(cls) + ' 班 ' : ''}${seat} 號</div>
+        <div class="main">
+          <img src="${base + p.icon}" alt="" onerror="this.style.display='none'">
+          <div class="txt"><div><span class="qty">× ${p.qty}</span></div><div class="name">${esc(p.colorZh)}　${esc(p.shapeZh)}</div><div class="no">零件編號 ${esc(p.partNo)}</div></div>
+        </div>
+      </div>`).join('')}</div>`).join('') || '<p style="padding:20px">請輸入座號範圍。</p>';
+  }
+  $('go').onclick = render;
+  $('print').onclick = () => window.print();
+  $('seats').addEventListener('keydown', (e) => { if (e.key === 'Enter') render(); });
+  render();
+})();
+</script>
+</body>
+</html>

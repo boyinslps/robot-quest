@@ -28,7 +28,7 @@ service cloud.firestore {
       return d.keys().hasOnly([
           'uid', 'docId', 'updatedAt', 'status', 'sessionCode', 'student', 'variantSeed',
           'startedAt', 'finishedAt', 'levels', 'programs', 'events', 'eventsTruncated', 'survey',
-          'clientInfo', 'appVersion'
+          'clientInfo', 'appVersion', 'assembly', 'rulesAck'
         ])
         && d.uid == request.auth.uid
         && d.status in ['playing', 'done']
