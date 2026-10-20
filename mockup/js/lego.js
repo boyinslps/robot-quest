@@ -13,9 +13,10 @@
   const dev = /[?&]dev\b/.test(location.search);
   const KEY = 'rq_lego_v1';
 
-  // 設定 + 網址覆寫（測試與特殊場次用）：?lego=0 不做、?gate=0 不用放行、?cap=秒 組裝時間、?sec=1 顯示秒數
-  const CFG = Object.assign({ enabled: true, objectId: 'guitar', timeCapSec: null, gateStart: true, showSeconds: false, seededShortages: {}, pinHash: '' }, window.RQ_LEGO || {});
+  // 設定 + 網址覆寫（測試與特殊場次用）：?lego=0 不做、?gate=1 要老師放行、?cap=秒 組裝時間、?sec=1 顯示秒數
+  const CFG = Object.assign({ enabled: true, objectId: 'guitar', timeCapSec: null, gateStart: false, showSeconds: false, seededShortages: {}, pinHash: '' }, window.RQ_LEGO || {});
   if (qs.get('lego') === '0') CFG.enabled = false;
+  if (qs.get('gate') === '1') CFG.gateStart = true;
   if (qs.get('gate') === '0') CFG.gateStart = false;
   if (qs.get('sec') === '1') CFG.showSeconds = true;
   if (Number(qs.get('cap')) > 0) CFG.timeCapSec = Number(qs.get('cap'));

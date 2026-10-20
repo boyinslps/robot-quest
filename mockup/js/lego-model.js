@@ -35,7 +35,7 @@
       objectId: obj.id,
       phase: 'count',
       cfg: {
-        gateStart: cfg.gateStart !== false,
+        gateStart: !!cfg.gateStart,
         timeCapSec: cfg.timeCapSec || obj.defaultTimeCapSec || 720,
         showSeconds: !!cfg.showSeconds,
         seeded: cfg.seeded || null,
