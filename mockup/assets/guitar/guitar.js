@@ -1,0 +1,29 @@
+/* 吉他的物件資料（和 guitar.json 內容相同）。file:// 開啟時 fetch 讀不到 JSON，所以另外放一份 .js 當備援；用 http 開啟時優先讀 guitar.json。 */
+(function (RQ) {
+  RQ.OBJECTS = RQ.OBJECTS || {};
+  RQ.OBJECTS.guitar = {
+  "id": "guitar",
+  "nameZh": "吉他",
+  "nameEn": "Guitar",
+  "source": "WRO 2026 RoboMission Elementary Building Instructions，原步驟 113–124；步驟已重編為 1–12；配色已依 8 份同時組裝調整（黃色 2×4／2×2 改白色，琴頸底部 1 顆 2×2 改黑色）",
+  "defaultTimeCapSec": 720,
+  "parts": [
+    { "bag": "A", "partNo": "3001", "colorZh": "紅色", "shapeZh": "2×4 磚",            "qty": 6, "icon": "icons/R3001.png" },
+    { "bag": "B", "partNo": "3009", "colorZh": "紅色", "shapeZh": "1×6 磚",            "qty": 6, "icon": "icons/R3009.png" },
+    { "bag": "C", "partNo": "3003", "colorZh": "紅色", "shapeZh": "2×2 磚",            "qty": 2, "icon": "icons/R3003.png" },
+    { "bag": "D", "partNo": "3700", "colorZh": "紅色", "shapeZh": "Technic 孔磚 1×2",  "qty": 2, "icon": "icons/R3700.png" },
+    { "bag": "E", "partNo": "3003", "colorZh": "白色", "shapeZh": "2×2 磚",            "qty": 2, "icon": "icons/W3003.png" },
+    { "bag": "F", "partNo": "3001", "colorZh": "白色", "shapeZh": "2×4 磚",            "qty": 2, "icon": "icons/W3001.png" },
+    { "bag": "G", "partNo": "3003", "colorZh": "黑色", "shapeZh": "2×2 磚",            "qty": 2, "icon": "icons/B3003.png" },
+    { "bag": "H", "partNo": "3035", "colorZh": "白色", "shapeZh": "4×8 板",            "qty": 1, "icon": "icons/W3035.png" }
+  ],
+  "totalPieces": 23,
+  "steps": [
+    "steps/step-01.jpg","steps/step-02.jpg","steps/step-03.jpg","steps/step-04.jpg",
+    "steps/step-05.jpg","steps/step-06.jpg","steps/step-07.jpg","steps/step-08.jpg",
+    "steps/step-09.jpg","steps/step-10.jpg","steps/step-11.jpg","steps/step-12.jpg"
+  ],
+  "stepImageSize": { "w": 1600, "h": 1132 }
+}
+;
+})((window.RQ = window.RQ || {}));

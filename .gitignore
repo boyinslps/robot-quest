@@ -4,8 +4,9 @@
 # 系統檔
 Thumbs.db
 .DS_Store
+
+# 老師專用、不公開（參考解、驗證頁）
 private/
 
-# 實體積木組裝關：說明書圖片來自 WRO 官方 Building Instructions，不要公開放在網路上（規格書 §15）
-mockup/assets/
+# Lego Quest 的規格書、原始 PDF 與壓縮檔（原始素材；網站用的圖片已經放在 mockup/assets/guitar/）
 lego quest/

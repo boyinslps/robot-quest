@@ -241,9 +241,9 @@
 - **離線**：說明書圖片進清點頁就先載入，翻頁不閃爍；整段可斷網完成（Blockly 另外要 CDN，Lego Quest 本身不需要網路）。`file://` 開啟時 `fetch` 讀不到 JSON，所以 `assets/guitar/guitar.js` 另放一份同內容的備援。
 - **上傳**：每次狀態改變（3 秒內合併）與組裝中每 30 秒上傳「進行中」；完成頁立刻上傳並顯示有沒有傳成功，沒傳成功叫學生舉手。下載結果檔 `班級_座號_assembly.json` 可以直接在後台「匯入結果檔」。
 
-### 說明書圖片不進公開的 git
+### 說明書圖片：老師決定公開
 
-規格 §15：說明書來自 WRO 官方 Building Instructions，建議只在校內網路或非公開網址部署。所以 `mockup/assets/`、`lego quest/` 都在 `.gitignore`，公開的 GitHub Pages 上看不到圖片（學生端會顯示明確的錯誤，老師可用密碼面板跳過）。正式施測請用老師電腦或校內網路。
+規格 §15 建議說明書（來自 WRO 官方 Building Instructions）只在校內網路或非公開網址部署，所以一開始 `mockup/assets/` 放在 `.gitignore`。老師後來決定：**考試一律用線上版開，不介意被看到**，所以把圖片一起推上 GitHub（`mockup/assets/guitar/`，1.2 MB）。`lego quest/`（規格書、原始 PDF 與壓縮檔）仍不進 git。
 
 ### 還沒做
 

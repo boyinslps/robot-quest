@@ -56,7 +56,7 @@ mockup/
   js/lego-model.js  Lego Quest 狀態機與計時（純邏輯）
   js/lego.js        Lego Quest 畫面、事件紀錄、老師密碼面板
   js/lego-config.js Lego Quest 設定（放行、時間、老師密碼）
-  assets/guitar/    吉他說明書圖片與零件資料（不進 git，見下方 Lego Quest）
+  assets/guitar/    吉他說明書圖片（12 步、8 種零件圖示）與零件資料；老師決定公開，已進 git
   serve.ps1         本機預覽伺服器（-Root 可指定資料夾，例如整個專案根目錄）
 shared/
   firebase-config.js  Firebase 設定（沒填就不連線）
@@ -71,7 +71,7 @@ firestore.rules      Firestore 安全規則（學生只能寫自己的、老師�
 FIREBASE_SETUP.md    Firebase 一次性設定步驟
 DECISIONS.md        設計決定與和原準則不同的地方（公開，不含答案）
 private/            老師專用、不公開（.gitignore）：參考解、關卡／評分／Lego Quest 的自動驗證、含答案的設計筆記
-lego quest/         Lego Quest 的規格書、原始 PDF 與壓縮檔（不進 git）
+lego quest/         Lego Quest 的規格書、原始 PDF 與壓縮檔（原始素材，不進 git）
 ```
 
 ## Lego Quest（實體積木組裝）
@@ -82,7 +82,7 @@ lego quest/         Lego Quest 的規格書、原始 PDF 與壓縮檔（不進 g
 
 **老師要做的事**
 
-1. **圖片資料夾**：`mockup/assets/guitar/`（圖片 1.2 MB）放在這台電腦上。**不要推到公開的 GitHub**（說明書來自 WRO 官方，已在 `.gitignore`）。沒有這個資料夾時，學生端會顯示「Lego Quest 無法開始」，老師用密碼面板可以跳過。
+1. **說明書圖片**：`mockup/assets/guitar/`（1.2 MB）已經在 repo 裡，線上版和本機都直接能用。沒有這個資料夾時，學生端會顯示「Lego Quest 無法開始」，老師用密碼面板可以跳過。
 2. **列印袋子標籤**：開 `teacher/labels.html`，輸入座號範圍（例 1-8）→ 列印。每位學生 8 張（A–H），黑白列印也看得清楚。
 3. **開始時間**：不用放行，老師現場口頭說「開始」，學生清點完自己按「開始組裝」。如果想要老師放行才能按（全班同時開始），網址加 `?gate=1`，再在學生電腦按 **Ctrl+Shift+L**（或連續點畫面右下角的署名 5 下）→ 輸入老師密碼 → 選「放行」；或把 `mockup/js/lego-config.js` 的 `gateStart` 改成 `true`。老師密碼預設 `1234`，請換掉（同一個檔案）。
 4. **缺件**：學生按「我的積木有缺」→ 畫面鎖住，後台「組裝」分頁最上面會出現「缺件待處理」→ 到學生旁邊補積木，用同一個密碼面板選「已補件」或「沒有缺件（誤報）」。
@@ -93,7 +93,6 @@ lego quest/         Lego Quest 的規格書、原始 PDF 與壓縮檔（不進 g
 **要求**：
 - Firestore 規則多了 `assembly`、`rulesAck` 兩個欄位，**要重新貼規則並發布**，否則整筆上傳會被擋（見 [FIREBASE_SETUP.md](FIREBASE_SETUP.md)）。
 - 組裝中重新整理頁面會回到原本的步驟，**計時不會重置也不會多給**。
-- 用公開的 GitHub Pages 開會看不到說明書（圖片不在 repo 裡）；正式施測請用老師電腦或校內網路。
 
 驗證：`private/lego-test.html`（狀態機、計時、還原、計分，55 項）。
 
