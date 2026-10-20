@@ -248,7 +248,7 @@
       sounds: false,
       comments: false,
       maxBlocks: lv.blockLimit ? lv.blockLimit + 1 : Infinity, // +1 是「機器人程式」本身
-      zoom: { controls: true, wheel: false, startScale: 1.15, maxScale: 1.6, minScale: 0.6, scaleSpeed: 1.15 },
+      zoom: { controls: true, wheel: false, startScale: 1.15 * RQ.uiScale(), maxScale: 1.6 * RQ.uiScale(), minScale: 0.6 * RQ.uiScale(), scaleSpeed: 1.15 }, // 大螢幕：積木跟著文字一起放大
       move: { scrollbars: true, drag: true, wheel: true },
       grid: { spacing: 24, length: 2, colour: '#e4dfd3', snap: true },
     });

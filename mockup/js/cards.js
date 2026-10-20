@@ -95,7 +95,7 @@
       div.className = 'card-blocks';
       extra.appendChild(div);
       requestAnimationFrame(() => {
-        const ws = Blockly.inject(div, { readOnly: true, theme: RQ.theme, renderer: 'thrasos', scrollbars: false, zoom: { startScale: 1 } });
+        const ws = Blockly.inject(div, { readOnly: true, theme: RQ.theme, renderer: 'thrasos', scrollbars: false, zoom: { startScale: RQ.uiScale() } });
         if (card.sample.prog) RQ.loadProgram(ws, RQ.normalize(card.sample.prog).map((n) => (n.t === 'if' ? { ...n, cond: null } : n)));
         else RQ.loadLoose(ws, card.sample.loose);
         cleanups.push(() => ws.dispose());
@@ -224,7 +224,7 @@
     requestAnimationFrame(async () => {
       RQ.blockOpts.sides = ['front'];
       RQ.blockOpts.is = ['bottle'];
-      ws = Blockly.inject(box.querySelector('.if-demo-blocks'), { readOnly: true, theme: RQ.theme, renderer: 'thrasos', scrollbars: false });
+      ws = Blockly.inject(box.querySelector('.if-demo-blocks'), { readOnly: true, theme: RQ.theme, renderer: 'thrasos', scrollbars: false, zoom: { startScale: RQ.uiScale() } });
       RQ.loadProgram(ws, prog);
       const withIds = RQ.compile(ws);
       while (alive) {

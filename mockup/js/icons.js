@@ -36,8 +36,14 @@
   RQ.ICON_PATHS = P;
 
   // HTML 內用：顏色跟著文字顏色（currentColor）
-  RQ.icon = (name, size, cls) =>
-    `<svg class="ico${cls ? ' ' + cls : ''}" viewBox="0 0 24 24" width="${size || 22}" height="${size || 22}" aria-hidden="true">${P[name]}</svg>`;
+  // 介面縮放倍率：根字級 ÷ 16（1366×768 = 1）。圖示、Blockly 積木都乘上它，才會跟著文字一起放大
+  RQ.uiScale = () => (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16) / 16;
+
+  // 尺寸用 rem（size 是 16px 基準下的大小），跟著畫面一起縮放
+  RQ.icon = (name, size, cls) => {
+    const r = (size || 22) / 16;
+    return `<svg class="ico${cls ? " " + cls : ""}" viewBox="0 0 24 24" style="width:${r}rem;height:${r}rem" aria-hidden="true">${P[name]}</svg>`;
+  };
 
   // Blockly 積木上的圖片用：data URI，顏色要寫死
   RQ.iconURI = (name, color) =>

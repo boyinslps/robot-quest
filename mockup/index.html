@@ -22,7 +22,7 @@
       <li><b>面試</b>會在考試之間的空檔，由老師<b>依序叫號</b>，請你到<b>隔壁教室</b>進行面試。</li>
       <li>其餘同學請<b>繼續完成考試</b>。面試完成的同學，請<b>自己回到電腦教室</b>，接著繼續測驗。</li>
       <li>考試期間<b>禁止交談、窺探他人螢幕</b>等行為，以免違反考試公平原則。經<b>監考老師確認</b>，會對成績<b>斟酌扣分</b>。</li>
-      <li>有問題、或積木有缺，請<b>直接舉手</b>，老師會過去。</li>
+      <li>有問題請<b>直接舉手</b>，老師會過去。<b>積木數量要在「開始組裝」之前檢查</b>，開始之後積木有缺是自己的責任。</li>
     </ol>
     <label class="rules-ack"><input type="checkbox" id="rules-ack"><span>我已經理解並確認能遵守以上說明</span></label>
     <button id="rules-go" class="big" type="button" disabled>開始（輸入班級座號）</button>
@@ -49,18 +49,17 @@
 
 <!-- ===== Lego Quest：實體積木組裝關（登入後先做這個；做完按「開始 Robot Quest」才進背景調查、說明、闖關）===== -->
 
-<!-- 清點積木 -->
+<!-- 積木清單：只展示圖表，學生自己檢查數量（沒有勾選、沒有缺件回報） -->
 <div id="screen-asm-count" class="screen asm asm-count" hidden>
   <header class="asm-head">
-    <h1>先數數看，積木有沒有缺？</h1>
-    <div class="asm-sub"><span id="asm-who"></span><span id="asm-progress" class="asm-progress"></span></div>
+    <h1>請檢查積木數量是否正確</h1>
+    <div class="asm-notice"><b>考試開始後，不得要求補發或更換積木，也不會因此延長時間。</b>積木有缺是自己的責任，請在按下「開始組裝」<u>之前</u>對照下面的圖表確認清楚。</div>
+    <div class="asm-sub"><span id="asm-who"></span><span id="asm-total" class="asm-progress"></span></div>
   </header>
   <div id="asm-cards" class="asm-cards"></div>
   <footer class="asm-foot">
-    <button id="asm-short" class="asm-btn danger" type="button">我的積木有缺</button>
     <button id="asm-start" class="asm-btn primary" type="button" disabled>開始組裝</button>
   </footer>
-  <div id="asm-mask" class="asm-mask" hidden><div><b>已通知老師</b><span>請先舉手等一下</span></div></div>
 </div>
 
 <!-- 組裝（看說明書） -->
@@ -81,7 +80,8 @@
     <button id="asm-next" class="asm-nav" type="button" aria-label="下一步"><span data-icon="next" data-size="44"></span><b>下一步</b></button>
   </main>
   <footer class="asm-bottom">
-    <button id="asm-finish" class="asm-btn primary" type="button" data-icon="check">完成</button>
+    <span id="asm-last-hint" class="asm-last-hint"></span>
+    <button id="asm-finish" class="asm-btn primary" type="button" data-icon="check" hidden>完成</button>
   </footer>
   <div id="asm-zoomov" class="asm-zoomov" hidden>
     <div class="asm-zoombar"><b></b><button id="asm-zoomclose" class="asm-tbtn" type="button">關閉</button></div>

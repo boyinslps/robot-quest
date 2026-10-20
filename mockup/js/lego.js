@@ -1,6 +1,6 @@
 /* Lego Quest（實體積木組裝關）：學生端畫面與流程
  *
- * 登入 → 清點積木 →（缺件回報）→ 老師放行 → 倒數 → 看說明書組裝 → 完成 → 「開始 Robot Quest」
+ * 登入 → 看積木清單（學生自己檢查數量）→ 倒數 → 看說明書組裝 → 翻到最後一頁按「完成」→ 「開始 Robot Quest」
  * 狀態機、計時在 lego-model.js（純邏輯）；這裡只負責畫面、事件紀錄、存檔（sessionStorage）、老師密碼面板。
  * 網站只記錄，不判斷作品對錯：作品由老師現場檢查，在教師後台勾選等級。
  */
@@ -14,7 +14,7 @@
   const KEY = 'rq_lego_v1';
 
   // 設定 + 網址覆寫（測試與特殊場次用）：?lego=0 不做、?gate=1 要老師放行、?cap=秒 組裝時間、?sec=1 顯示秒數
-  const CFG = Object.assign({ enabled: true, objectId: 'guitar', timeCapSec: null, gateStart: false, showSeconds: false, seededShortages: {}, pinHash: '' }, window.RQ_LEGO || {});
+  const CFG = Object.assign({ enabled: true, objectId: 'guitar', timeCapSec: null, gateStart: false, showSeconds: false, pinHash: '' }, window.RQ_LEGO || {});
   if (qs.get('lego') === '0') CFG.enabled = false;
   if (qs.get('gate') === '1') CFG.gateStart = true;
   if (qs.get('gate') === '0') CFG.gateStart = false;
@@ -182,7 +182,7 @@
   }
   const closeModals = () => document.querySelectorAll('.asm-modal').forEach((m) => m.remove());
 
-  // ----- 清點頁 -----
+  // ----- 清點頁：只展示積木清單，學生自己檢查數量（沒有勾選、沒有缺件回報）-----
 
   function buildCards() {
     const box = $('asm-cards');
@@ -196,80 +196,18 @@
         <div class="asm-icon"><img src="${obj.base + p.icon}" alt="${p.colorZh}${p.shapeZh}"></div>
         <div class="asm-qty">× ${p.qty}</div>
         <div class="asm-name">${p.colorZh}　${p.shapeZh}</div>
-        <div class="asm-no">零件編號 ${p.partNo}</div>
-        <button type="button" class="asm-check"><span class="asm-ck"></span><span class="asm-ck-t">我數過了，有 ${p.qty} 顆</span></button>`;
-      c.querySelector('.asm-check').onclick = () => toggleCheck(p.bag);
+        <div class="asm-no">零件編號 ${p.partNo}</div>`;
       box.appendChild(c);
     });
-    box.dataset.built = '1';
-  }
-
-  function toggleCheck(bag) {
-    if (state.phase === 'shortage_pending') return;
-    const on = !state.checks[bag];
-    const wasReady = state.phase === 'ready';
-    if (!dispatch({ type: on ? 'CHECK' : 'UNCHECK', bag })) return;
-    ev(on ? 'asm_count_check' : 'asm_count_uncheck', { bag });
-    if (!wasReady && state.phase === 'ready') ev('asm_ready');
-    save();
-    renderCount();
+    $('asm-total').textContent = `共 ${obj.parts.length} 袋、${obj.totalPieces} 顆`;
   }
 
   function renderCount() {
     show('screen-asm-count');
-    const ph = state.phase;
-    obj.parts.forEach((p) => {
-      const c = $('asm-cards').querySelector(`[data-bag="${p.bag}"]`);
-      if (!c) return;
-      const on = !!state.checks[p.bag];
-      c.classList.toggle('on', on);
-      c.querySelector('.asm-ck').innerHTML = on ? RQ.icon('check', 22) : '';
-      c.querySelector('.asm-ck-t').textContent = on ? `數過了，有 ${p.qty} 顆` : `我數過了，有 ${p.qty} 顆`;
-    });
-    const n = state.bags.filter((b) => state.checks[b]).length;
-    $('asm-progress').textContent = `已清點 ${n} / ${state.bags.length}`;
-    const ready = ph === 'ready';
-    const wait = ready && state.cfg.gateStart && !state.gate;
+    const wait = state.cfg.gateStart && !state.gate;
     const startBtn = $('asm-start');
-    startBtn.disabled = !ready || wait;
+    startBtn.disabled = wait;
     startBtn.textContent = wait ? '等老師說開始' : '開始組裝';
-    $('asm-mask').hidden = ph !== 'shortage_pending';
-    $('asm-short').disabled = ph === 'shortage_pending';
-  }
-
-  function openShortage() {
-    if (state.phase !== 'count' && state.phase !== 'ready') return;
-    ev('asm_shortage_open');
-    const lack = {};
-    const rows = obj.parts.map((p) => `
-      <div class="asm-sr" data-bag="${p.bag}">
-        <div class="asm-sr-b">${p.bag}</div>
-        <img src="${obj.base + p.icon}" alt="">
-        <div class="asm-sr-n"><b>${p.colorZh}　${p.shapeZh}</b><span>應該有 ${p.qty} 顆</span></div>
-        <div class="asm-sr-c"><button type="button" class="asm-pm" data-d="-1" aria-label="少一顆">－</button><b class="asm-sr-v">0</b><button type="button" class="asm-pm" data-d="1" aria-label="多缺一顆">＋</button></div>
-      </div>`).join('');
-    const m = modal(`<h2>缺哪些積木？</h2><p class="muted">按 ＋ 填入缺幾顆，沒有缺的就不用動。</p><div class="asm-sr-list">${rows}</div>`, [
-      { label: '先不要', cls: '' },
-      {
-        label: '通知老師', cls: 'primary',
-        fn: () => {
-          const items = Object.entries(lack).filter(([, v]) => v > 0).map(([bag, short]) => ({ bag, short }));
-          if (!items.length) { m.el.querySelector('.asm-modal-body').insertAdjacentHTML('beforeend', '<p class="err">請先選缺的積木</p>'); return false; }
-          if (dispatch({ type: 'REPORT_SHORTAGE', items })) { ev('asm_shortage_report', { items }); save(); renderCount(); }
-        },
-      },
-    ], { wide: true });
-    m.el.querySelectorAll('.asm-sr').forEach((row) => {
-      const bag = row.dataset.bag;
-      const max = state.qty[bag];
-      row.querySelectorAll('.asm-pm').forEach((b) => {
-        b.onclick = () => {
-          lack[bag] = Math.max(0, Math.min(max, (lack[bag] || 0) + Number(b.dataset.d)));
-          row.querySelector('.asm-sr-v').textContent = lack[bag];
-          row.classList.toggle('on', lack[bag] > 0);
-        };
-      });
-    });
   }
 
   // ----- 開始 → 倒數 → 組裝 -----
@@ -313,6 +251,11 @@
     $('asm-img').src = stepUrl();
     $('asm-prev').disabled = state.step <= 1;
     $('asm-next').disabled = state.step >= state.totalSteps;
+    // 「完成」只在最後一頁出現；其他頁顯示提示，說明為什麼沒有按鈕（版面不跳動）
+    const last = state.step >= state.totalSteps;
+    $('asm-finish').hidden = !last;
+    $('asm-last-hint').hidden = last;
+    $('asm-last-hint').textContent = `翻到最後一頁（第 ${state.totalSteps} 步）才會出現「完成」`;
     $('asm-time-txt').hidden = !state.cfg.showSeconds;
     startTimer();
     tickTimer();
@@ -439,7 +382,7 @@
 
   function route() {
     switch (state.phase) {
-      case 'count': case 'ready': case 'shortage_pending': renderCount(); break;
+      case 'count': renderCount(); break;
       case 'countdown': runCountdown(); break;
       case 'building': renderBuild(); break;
       case 'finished': case 'timeout': toWaiting(); break;
@@ -481,13 +424,13 @@
 
     const saved = loadSaved();
     const same = saved && saved.state && saved.student && saved.student.class === student.class && Number(saved.student.seat) === Number(student.seat) && saved.state.objectId === obj.id;
-    if (same) {
-      state = M.restore(saved.state, now());
+    const restored = same ? M.restore(saved.state, now()) : null; // 舊版存檔（有勾選、缺件）格式不同，回傳 null → 重新開始
+    if (restored) {
+      state = restored;
       events = saved.events || [];
       ev('asm_restore', { phase: state.phase });
     } else {
-      const seeded = (CFG.seededShortages || {})[student.seat] || null;
-      state = M.initial(obj, { gateStart: CFG.gateStart, timeCapSec: CFG.timeCapSec, showSeconds: CFG.showSeconds, seeded }, now());
+      state = M.initial(obj, { gateStart: CFG.gateStart, timeCapSec: CFG.timeCapSec, showSeconds: CFG.showSeconds }, now());
       events = [];
       ev('asm_count_enter');
     }
@@ -497,7 +440,7 @@
     route();
   };
 
-  // ---------- 老師密碼面板（離線也能處理：放行、缺件、跳過）----------
+  // ---------- 老師密碼面板（離線也能處理：放行、重設、跳過）----------
   // 規格書寫的是 Ctrl+Shift+T，但那是 Chrome 保留的「重開剛關掉的分頁」，網頁攔截不到，所以改成 Ctrl+Shift+L；
   // 另外也可以連續點 5 下畫面右下角的署名。
 
@@ -527,12 +470,8 @@
   function teacherActions() {
     const ph = state ? state.phase : 'error';
     const acts = [];
-    if (state && (ph === 'count' || ph === 'ready') && state.cfg.gateStart && !state.gate) {
+    if (state && ph === 'count' && state.cfg.gateStart && !state.gate) {
       acts.push({ label: '放行（這位同學可以按「開始組裝」）', cls: 'primary', fn: () => { if (dispatch({ type: 'GATE_OPEN' })) { ev('asm_gate_open', { via: 'pin' }); save(); renderCount(); } } });
-    }
-    if (ph === 'shortage_pending') {
-      acts.push({ label: '已補件（卡片重置，學生重新數）', cls: 'primary', fn: () => { if (dispatch({ type: 'RESOLVE_SHORTAGE', result: 'restocked', via: 'pin' })) { ev('asm_shortage_resolved', { result: 'restocked', via: 'pin' }); save(); renderCount(); } } });
-      acts.push({ label: '沒有缺件（誤報）', cls: '', fn: () => { if (dispatch({ type: 'RESOLVE_SHORTAGE', result: 'false_alarm', via: 'pin' })) { ev('asm_shortage_resolved', { result: 'false_alarm', via: 'pin' }); save(); renderCount(); } } });
     }
     if (state && ph !== 'waiting_check') {
       acts.push({ label: '重設這位同學的 Lego Quest（重新開始）', cls: '', fn: () => resetLego() });
@@ -546,13 +485,13 @@
   }
 
   function resetLego() {
-    modal('<h2>確定要重設嗎？</h2><p>這位同學的清點與組裝紀錄會被清掉，從頭開始。</p>', [
+    modal('<h2>確定要重設嗎？</h2><p>這位同學的組裝紀錄會被清掉，從頭開始。</p>', [
       { label: '取消', cls: '' },
       {
         label: '重設', cls: 'primary',
         fn: () => {
           const prev = events;
-          state = M.initial(obj, { gateStart: CFG.gateStart, timeCapSec: CFG.timeCapSec, showSeconds: CFG.showSeconds, seeded: (CFG.seededShortages || {})[student.seat] || null }, now());
+          state = M.initial(obj, { gateStart: CFG.gateStart, timeCapSec: CFG.timeCapSec, showSeconds: CFG.showSeconds }, now());
           events = prev.slice(-50); // 留著舊紀錄的尾巴，之後查得到有重設過
           ev('asm_reset', { via: 'pin' });
           stopTimer();
@@ -567,7 +506,6 @@
   // ---------- 事件綁定 ----------
 
   $('asm-start').onclick = pressStart;
-  $('asm-short').onclick = openShortage;
   $('asm-prev').onclick = () => go(state.step - 1, 'prev');
   $('asm-next').onclick = () => go(state.step + 1, 'next');
   $('asm-zoom').onclick = openZoom;
@@ -600,14 +538,14 @@
   })();
 
   document.addEventListener('visibilitychange', () => {
-    if (!active || !state || !['count', 'ready', 'shortage_pending', 'countdown', 'building'].includes(state.phase)) return;
+    if (!active || !state || !['count', 'countdown', 'building'].includes(state.phase)) return;
     ev(document.hidden ? 'tab_hidden' : 'tab_visible');
     save();
   });
 
   window.addEventListener('beforeunload', (e) => {
     if (dev || !active || !state) return;
-    if (['count', 'ready', 'shortage_pending', 'countdown', 'building'].includes(state.phase)) { e.preventDefault(); e.returnValue = ''; }
+    if (['count', 'countdown', 'building'].includes(state.phase)) { e.preventDefault(); e.returnValue = ''; }
   });
 
   // 登入頁的提示文字：不做 Lego Quest 時就不顯示

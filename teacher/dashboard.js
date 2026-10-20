@@ -333,8 +333,7 @@
     if (!a) return { text: '—', cls: 'muted' };
     if (a.skipped) return { text: '跳過', cls: 'muted' };
     switch (a.phase) {
-      case 'count': case 'ready': return { text: '清點中', cls: 'live' };
-      case 'shortage_pending': return { text: '缺件待處理', cls: 'ng' };
+      case 'count': return { text: '準備中（檢查積木）', cls: 'live' };
       case 'countdown': return { text: '倒數中', cls: 'live' };
       case 'building': return { text: '組裝中', cls: 'live' };
       default: return a.build && a.build.timedOut ? { text: '逾時，待檢查', cls: 'ng' } : { text: '已完成，待檢查', cls: 'ok' };
@@ -364,15 +363,6 @@
     </select>`;
   }
 
-  /** 缺件待處理的同學：老師到學生旁邊用「老師面板」（Ctrl+Shift+L）處理 */
-  function asmAlerts(list) {
-    const rows = list.filter((p) => { const a = legoOf(p); return a && a.phase === 'shortage_pending'; }).map((p) => {
-      const rs = legoOf(p).count.shortageReports;
-      const last = rs[rs.length - 1];
-      return `<b>${esc(p.cls)} 班 ${p.seat} 號</b>（${last.items.map((i) => `${esc(i.bag)} 袋缺 ${i.short} 顆`).join('、')}）`;
-    });
-    return rows.length ? `<div class="asm-alert"><b>缺件待處理：</b>${rows.join('；')}。請到該同學的電腦按 Ctrl+Shift+L 輸入老師密碼，選「已補件」或「沒有缺件（誤報）」。</div>` : '';
-  }
 
   function assemblyHtml() {
     const st = 'assembly';
@@ -390,7 +380,7 @@
         <td><input class="note-in" type="text" maxlength="200" value="${esc(rec.note || '')}" ${dis}></td><td class="muted">${at}</td></tr>`;
     }).join('');
     const legend = AS.GRADES.map((g) => `<b>${esc(g.label)}</b> ${g.score} 分（${esc(g.hint)}）`).join('　');
-    return `${asmAlerts(list)}<div class="addbar">
+    return `<div class="addbar">
         <b>新增學生</b>
         <label>班級 <input id="add-cls" size="6" placeholder="501"></label>
         <label>座號 <input id="add-seat" size="10" placeholder="5　或　1-30"></label>
@@ -399,7 +389,7 @@
         <a class="btnlink" href="labels.html" target="_blank">列印袋子標籤</a>
         <button data-act="csv">匯出 CSV</button>
       </div>
-      <p class="muted">學生做完 Lego Quest 後，老師檢查作品，在「檢查結果」勾選等級就好，離開欄位自動儲存。${legend}。用時、翻頁與放大次數、缺件回報只給老師參考，不計分。</p>
+      <p class="muted">學生做完 Lego Quest 後，老師檢查作品，在「檢查結果」勾選等級就好，離開欄位自動儲存。${legend}。用時、翻頁與放大次數只給老師參考，不計分。</p>
       <div class="table-wrap"><table class="entry"><thead>${thead(ASM_COLS, st)}</thead><tbody>${body}</tbody></table></div>
       ${list.length ? '' : `<p class="muted pad">${state.people.length ? '沒有符合篩選條件的資料。' : '還沒有學生。學生登入後會自動出現，或在上面「新增學生」輸入班級與座號（座號可寫 1-30 一次加入整班）。'}</p>`}`;
   }
@@ -424,16 +414,11 @@
     if (a) {
       const ls = legoStatus(a);
       const b = a.build;
-      const reports = (a.count && a.count.shortageReports) || [];
-      const rText = reports.length
-        ? reports.map((r) => `${r.items.map((i) => `${esc(i.bag)} 袋缺 ${i.short} 顆`).join('、')} → ${r.resolution === 'restocked' ? '已補件' : r.resolution === 'false_alarm' ? '<span class="ng">誤報</span>' : '<span class="ng">待處理</span>'}`).join('；')
-        : '沒有';
-      const seeded = a.count && a.count.seededShortage;
       const dwell = b && b.stepDwellMs ? b.stepDwellMs.map((ms, i) => `<span class="dw" title="第 ${i + 1} 步">${i + 1}:${Math.round(ms / 1000)}s</span>`).join(' ') : '';
       const ack = p.program && p.program.sub && p.program.sub.rulesAck;
       info = `<div class="bgbox"><b>Lego Quest：</b><span class="${ls.cls}">${esc(ls.text)}</span>${a.skipped ? '（老師跳過）' : ''}
         <div class="muted">考試說明：${ack ? `已確認「理解並能遵守」（${esc(new Date(ack.at).toLocaleTimeString('zh-TW'))}）` : '<span class="ng">沒有確認紀錄</span>'}</div>
-        <div class="muted">清點用時 ${a.count && a.count.durationMs != null ? mmss(a.count.durationMs) : '—'}　缺件回報：${rText}${seeded ? `　<b>被故意少放 ${esc(seeded.bag)} 袋 ${seeded.short} 顆，${seeded.noticed ? '有發現' : '<span class="ng">沒發現</span>'}</b>` : ''}</div>
+        <div class="muted">看積木清單用了 ${a.count && a.count.durationMs != null ? mmss(a.count.durationMs) : '—'}（積木數量是學生自己檢查，缺件不補發）</div>
         ${b ? `<div class="muted">組裝用時 ${b.durationMs != null ? mmss(b.durationMs) : '進行中'}${b.timedOut ? '（<span class="ng">逾時</span>）' : ''}　結束在第 ${b.finishedAtStep || '—'} 步（最遠到第 ${b.maxStepReached} 步）　上一步 ${b.backNavCount} 次　放大 ${b.zoomCount} 次</div>
         <div class="muted">各步停留（秒）：${dwell}</div>` : ''}</div>`;
     }
@@ -572,7 +557,7 @@
       <p>${wIn} <button class="primary" data-act="save-weights" ${disabled}>儲存權重</button></p>
 
       <h2>組裝（Lego Quest）：老師勾選等級</h2>
-      <p>學生拼完吉他後，老師檢查作品，勾選下面其中一個等級，分數就固定了。用時、翻頁與放大次數、缺件回報只給老師參考，不計分。分數可以在 <code>shared/assembly-scoring.js</code> 的 <code>GRADES</code> 調整。</p>
+      <p>學生拼完吉他後，老師檢查作品，勾選下面其中一個等級，分數就固定了。用時、翻頁與放大次數只給老師參考，不計分。分數可以在 <code>shared/assembly-scoring.js</code> 的 <code>GRADES</code> 調整。</p>
       <table><thead><tr><th>等級</th><th class="num">分數</th><th>什麼時候勾</th></tr></thead><tbody>${AS.GRADES.map((g) => `<tr><td><b>${esc(g.label)}</b></td><td class="num">${g.score}</td><td>${esc(g.hint)}</td></tr>`).join('')}</tbody></table>
 
       <h2>面試：評分項目（選填）</h2>
@@ -778,13 +763,13 @@
       })));
     } else if (v === 'assembly') {
       const list = sortList(visible(state.people), ASM_COLS, state.sort[v]);
-      downloadCsv('機器人校隊選拔_組裝.csv', [['班級', '座號', 'Lego狀態', '組裝用時(秒)', '逾時', '結束在第幾步', '上一步次數', '放大次數', '缺件回報次數', '檢查結果', '分數', '名次', '備註', '評分者']]
+      downloadCsv('機器人校隊選拔_組裝.csv', [['班級', '座號', 'Lego狀態', '組裝用時(秒)', '逾時', '結束在第幾步', '上一步次數', '放大次數', '檢查結果', '分數', '名次', '備註', '評分者']]
         .concat(list.map((p) => {
           const rec = (p.doc && p.doc.assembly) || {};
           const a = legoOf(p);
           const b = (a && a.build) || {};
           const g = AS.byKey(rec.grade);
-          return [p.cls, p.seat, legoStatus(a).text, durMs(a) !== null ? Math.round(durMs(a) / 1000) : '', b.timedOut ? '是' : '', b.finishedAtStep || '', b.backNavCount, b.zoomCount, a && a.count ? a.count.shortageReports.length : '', g ? g.label : '', p.s.assembly, p.rk.assembly, rec.note || '', rec.by || ''];
+          return [p.cls, p.seat, legoStatus(a).text, durMs(a) !== null ? Math.round(durMs(a) / 1000) : '', b.timedOut ? '是' : '', b.finishedAtStep || '', b.backNavCount, b.zoomCount, g ? g.label : '', p.s.assembly, p.rk.assembly, rec.note || '', rec.by || ''];
         })));
     } else if (MANUAL.includes(v)) {
       const items = T.config.items[v];
