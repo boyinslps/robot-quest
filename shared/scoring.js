@@ -7,6 +7,10 @@
  *   D 獨立思考    5　沒有開「提示」就過關的關卡比例
  *   E 隱藏關卡   15　循線挑戰：練習地圖過關 7 分（沒過但有走一段給部分分）＋通用化 8 分（隱藏地圖也過）
  *
+ * 額外加分（不佔那 100 分，最多 +10）：
+ *   F 巧思加分　　積木沒有上限，笨方法也能過關；但「聰明的寫法」（積木數達 3 星）的關卡額外加分，
+ *               只算有 smart 標記的關卡（2、4、6、7、8），按權重分配。總分最高仍是 100。
+ *
  * 另外算六項「能力」百分比，給老師看每個人強在哪、弱在哪（不影響總分）。
  * 老師可以在後台對個人加減分（review.adjust）、寫備註、標記入選與否。
  */
@@ -38,24 +42,27 @@
   // concept：這關要學的新積木，最後的程式有用到才算「觀念運用」
   const LEVELS = {
     1: { weight: 3, skills: ['sequence'], concept: '向左／向右轉', used: (p) => hasType(p, 'left') || hasType(p, 'right') },
-    2: { weight: 4, skills: ['loop'], concept: '重複 N 次', used: (p) => hasType(p, 'repeat') },
+    2: { weight: 4, smart: true, skills: ['loop'], concept: '重複 N 次', used: (p) => hasType(p, 'repeat') },
     // 權重跟著「第幾關」走（越後面越高），不跟著概念走；第 3–5 關：旋轉 → 如果 → 搬運
     3: { weight: 5, skills: ['sequence'], concept: '旋轉 X 度', used: (p) => hasType(p, 'turn') },
-    4: { weight: 5, skills: ['condition', 'sensor'], concept: '如果…就…（偵測寶特瓶）', used: (p) => has(p, (n) => n.t === 'if' && n.cond && n.cond.t === 'look') },
+    4: { weight: 5, smart: true, skills: ['condition', 'sensor'], concept: '如果…就…（偵測寶特瓶）', used: (p) => has(p, (n) => n.t === 'if' && n.cond && n.cond.t === 'look') },
     5: { weight: 6, skills: ['loop', 'sequence'], concept: '夾取＋放下', used: (p) => hasType(p, 'grab') && hasType(p, 'drop') },
-    6: { weight: 6, skills: ['loop', 'abstraction'], concept: '一直做直到終點', used: (p) => hasType(p, 'until') },
+    6: { weight: 6, smart: true, skills: ['loop', 'abstraction'], concept: '一直做直到終點', used: (p) => hasType(p, 'until') },
     7: {
       weight: 11,
+      smart: true,
       skills: ['condition', 'sensor', 'abstraction', 'sequence'],
       concept: '綜合：夾取＋一直做＋同時偵測牆和寶特瓶',
       used: (p) => hasType(p, 'grab') && hasType(p, 'drop') && hasType(p, 'until')
         && has(p, (n) => n.t === 'if' && n.cond && n.cond.is === 'wall') && has(p, (n) => n.t === 'if' && n.cond && n.cond.is === 'bottle'),
     },
-    8: { weight: 15, skills: ['debug', 'condition'], concept: '精準除錯（不是整段重寫）', used: null },
+    8: { weight: 15, smart: true, skills: ['debug', 'condition'], concept: '精準除錯（不是整段重寫）', used: null },
   };
   const TITLES = { 1: '轉個彎', 2: '爬樓梯', 3: '旋轉 X 度', 4: '寶特瓶轉彎', 5: '搬運任務', 6: '一直走到終點', 7: '倉庫配送', 8: '修好它（魔王關）' };
   const MAIN_IDS = Object.keys(LEVELS).map(Number);
   const WEIGHT_SUM = MAIN_IDS.reduce((s, i) => s + LEVELS[i].weight, 0); // 55
+  const BONUS_MAX = 10;
+  const SMART_SUM = MAIN_IDS.reduce((s, i) => s + (LEVELS[i].smart ? LEVELS[i].weight : 0), 0); // 41
 
   const DIMENSIONS = [
     { key: 'A', name: '關卡完成度', max: 55, desc: '第 1–8 關是否過關，越後面權重越高（3、4、5、5、6、6、11、15）。沒過關但有往終點前進，最多拿該關 25%。' },
@@ -63,6 +70,7 @@
     { key: 'C', name: '觀念運用', max: 10, desc: '已過關的關卡，最後交出的程式有用到這關要學的新積木（魔王關看有沒有整段重寫）。' },
     { key: 'D', name: '獨立思考', max: 5, desc: '沒有開「提示」就過關的關卡數 ÷ 8。' },
     { key: 'E', name: '隱藏關卡', max: 15, desc: '循線挑戰：練習地圖過關 7 分（沒過但有走一段按比例給 ≤4 分）＋通用化 8 分（隱藏地圖也過；沒過但有用感測器給 2 分）。' },
+    { key: 'F', name: '巧思加分', max: 10, bonus: true, desc: '額外加分，總分最高仍是 100。積木沒有上限，但第 2、4、6、7、8 關用聰明的寫法（積木數達 3 星）過關，按關卡權重分配最多 +10。' },
   ];
 
   const SKILLS = [
@@ -100,7 +108,7 @@
     const programs = sub.programs || {};
     const out = { version: VERSION, levels: [], flags: [] };
 
-    let A = 0, B = 0, C = 0, noHint = 0;
+    let A = 0, B = 0, C = 0, F = 0, noHint = 0;
     const skillGot = {};
     const skillMax = {};
     SKILLS.forEach((s) => { skillGot[s.key] = 0; skillMax[s.key] = 0; });
@@ -110,7 +118,7 @@
     MAIN_IDS.forEach((id) => {
       const cfg = LEVELS[id];
       const l = lm[id];
-      const row = { id, title: (l && l.title) || TITLES[id], concept: cfg.concept, weight: cfg.weight, visited: !!l, cleared: false, stars: 0, a: 0, b: 0, c: 0, usedConcept: null };
+      const row = { id, title: (l && l.title) || TITLES[id], concept: cfg.concept, weight: cfg.weight, visited: !!l, cleared: false, stars: 0, a: 0, b: 0, c: 0, f: 0, usedConcept: null };
       let ach = 0; // 0..1，給能力雷達用
       if (l) {
         reached = id;
@@ -126,6 +134,7 @@
           const used = cfg.used ? hasProg(prog) && cfg.used(prog) : !l.rewrote;
           row.usedConcept = !!used;
           if (used) row.c = (10 * cfg.weight) / WEIGHT_SUM;
+          if (cfg.smart && (l.stars || 0) >= 3) row.f = (BONUS_MAX * cfg.weight) / SMART_SUM;
           if (!l.hint) noHint++;
           ach = 0.6 + 0.4 * ((l.stars || 1) / 3);
           if (!used) ach = Math.min(ach, 0.6);
@@ -139,7 +148,7 @@
         }
         if (l.skipped) out.flags.push(`第 ${id} 關選擇跳過`);
       }
-      A += row.a; B += row.b; C += row.c;
+      A += row.a; B += row.b; C += row.c; F += row.f;
       cfg.skills.forEach((k) => { skillGot[k] += ach * cfg.weight; skillMax[k] += cfg.weight; });
       out.levels.push(row);
     });
@@ -165,10 +174,11 @@
     out.hidden = hidden;
 
     const D = (5 * noHint) / MAIN_IDS.length;
-    const dims = { A: r1(A), B: r1(B), C: r1(C), D: r1(D), E: r1(E) };
-    const raw = Math.round((dims.A + dims.B + dims.C + dims.D + dims.E) * 10) / 10;
+    const dims = { A: r1(A), B: r1(B), C: r1(C), D: r1(D), E: r1(E), F: r1(F) };
+    const raw = Math.round((dims.A + dims.B + dims.C + dims.D + dims.E + dims.F) * 10) / 10;
     const adjust = (review && Number(review.adjust)) || 0;
-    const total = Math.max(0, Math.min(100, Math.round(raw + adjust)));
+    // 巧思加分算進去後最高 100，老師加減分再加在後面
+    const total = Math.max(0, Math.min(100, Math.round(Math.min(100, raw) + adjust)));
     const g = gradeOf(total);
 
     out.dims = dims;
@@ -274,5 +284,5 @@
     return lines;
   }
 
-  RQ.Scoring = { VERSION, POTENTIAL, surveyText, LEVELS, TITLES, MAIN_IDS, DIMENSIONS, SKILLS, GRADES, gradeOf, score, programText, WEIGHT_SUM };
+  RQ.Scoring = { VERSION, POTENTIAL, surveyText, LEVELS, TITLES, MAIN_IDS, DIMENSIONS, SKILLS, GRADES, gradeOf, score, programText, WEIGHT_SUM, BONUS_MAX, SMART_SUM };
 })((window.RQ = window.RQ || {}));

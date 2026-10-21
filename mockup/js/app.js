@@ -119,8 +119,24 @@
     }
     S.student = { grade: Number(f.get('grade')), class: cls, seat };
     S.variant = seat % 2 === 1 ? 'A' : 'B'; // 相鄰座號拿到鏡像地圖
+    newAttempt(); // 每次登入都是新的一筆；以前登入過的資料原封不動留在資料庫
     startAfterLogin();
   });
+
+  // 登入代碼：每次登入產生一個，存在 sessionStorage（重新整理頁面時沿用同一個，所以重新整理不會多出一筆；
+  // 關掉分頁再登入就是新的一筆）。上傳的文件代號會帶著它。
+  const ATTEMPT_KEY = 'rq_attempt';
+  let attemptMem = null;
+  function newAttempt() {
+    attemptMem = Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+    try { sessionStorage.setItem(ATTEMPT_KEY, attemptMem); } catch (e) { /* 忽略：只有記憶體裡有 */ }
+    return attemptMem;
+  }
+  function attemptId() {
+    if (attemptMem) return attemptMem;
+    try { attemptMem = sessionStorage.getItem(ATTEMPT_KEY); } catch (e) { /* 忽略 */ }
+    return attemptMem || newAttempt();
+  }
 
   // 登入後先做 Lego Quest（實體積木組裝）；做完按「開始 Robot Quest」才進背景調查、說明、闖關
   function startAfterLogin() {
@@ -756,7 +772,8 @@
   // ---------- 上傳到 Firebase（沒設定就略過）----------
 
   const cloudOn = () => !dev && RQ.cloud && RQ.cloud.enabled && S.student;
-  const docId = () => RQ.cloud.docId(S.sessionCode, S.student.class, S.student.seat);
+  // 每次登入一個新的「登入代碼」（見 attemptId）：同一個班級座號再登入會新增一筆，不會蓋掉前一筆
+  const docId = () => RQ.cloud.docId(S.sessionCode, S.student.class, S.student.seat, attemptId());
 
   function syncCloud(status) {
     if (!cloudOn()) return;

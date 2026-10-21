@@ -58,7 +58,7 @@
     const get = (cls, seat, grade) => {
       const key = T.keyOf(cls, seat);
       let p = map.get(key);
-      if (!p) { p = { key, cls: String(cls), seat: Number(seat), grade: grade || '', program: null, doc: null }; map.set(key, p); }
+      if (!p) { p = { key, cls: String(cls), seat: Number(seat), grade: grade || '', program: null, doc: null, records: [] }; map.set(key, p); }
       else if (!p.grade && grade) p.grade = grade;
       return p;
     };
@@ -68,6 +68,7 @@
       const sc = SC.score(sub, T.reviews.get(id) || null);
       const pr = { id, sub, review: T.reviews.get(id) || null, sc, done: sub.status !== 'playing' };
       const p = get(sub.student.class, sub.student.seat, sub.student.grade);
+      p.records.push(pr); // 同一位同學重新登入會有好幾筆，全部保留；程式關取最好的一筆，Lego Quest 取最完整的一筆
       if (!p.program || betterProgram(pr, p.program)) p.program = pr;
     });
     T.scores.forEach((d) => { if (d.class !== undefined) get(d.class, d.seat, d.grade).doc = d; });
@@ -325,7 +326,20 @@
 
   // ---------- 組裝（Lego Quest）：老師檢查作品後只要勾選等級，分數由 shared/assembly-scoring.js 決定 ----------
 
-  const legoOf = (p) => (p.program && p.program.sub && p.program.sub.assembly) || null;
+  // Lego Quest 的完整程度：做完 > 組裝中 > 倒數 > 看清單
+  const LEGO_RANK = { waiting_check: 4, finished: 4, timeout: 4, building: 3, countdown: 2, count: 1 };
+  function legoRecord(p) {
+    let best = null;
+    (p.records || []).forEach((r) => {
+      const a = r.sub.assembly;
+      if (!a) return;
+      const rank = LEGO_RANK[a.phase] || 0;
+      const t = r.sub.updatedAtMs || 0;
+      if (!best || rank > best.rank || (rank === best.rank && t > best.t)) best = { r, rank, t };
+    });
+    return best ? best.r : null;
+  }
+  const legoOf = (p) => { const r = legoRecord(p); return r ? r.sub.assembly : null; };
   const durMs = (a) => (a && a.build && typeof a.build.durationMs === 'number' ? a.build.durationMs : null);
 
   /** 學生的 Lego Quest 狀態（學生端每次改變就上傳，所以是接近即時的） */
@@ -405,6 +419,20 @@
     guard(T.saveStage(p, 'assembly', { score: g ? g.score : null, grade: g ? g.key : null, items: {}, note }), '已儲存 ✓');
   }
 
+  /** 同一位同學有好幾筆紀錄（重新登入過）：列出來。資料都保留在資料庫，不會被蓋掉。 */
+  function recordsNote(p) {
+    const rs = p.records || [];
+    if (rs.length < 2) return '';
+    const when = (r) => { const t = r.sub.finishedAt ? Date.parse(r.sub.finishedAt) : r.sub.updatedAtMs; return t ? new Date(t).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''; };
+    const rows = [...rs].sort((a, b) => (b.sub.updatedAtMs || 0) - (a.sub.updatedAtMs || 0)).map((r) => {
+      const a = r.sub.assembly;
+      const used = r === p.program ? '　<b>← 程式關採用這一筆</b>' : '';
+      const lg = a ? legoStatus(a).text : '沒做 Lego Quest';
+      return `<li>${esc(when(r))}　${r.done ? '已完成' : '進行中'}　程式 ${r.sc.total} 分　Lego：${esc(lg)}${used}</li>`;
+    }).join('');
+    return `<div class="bgbox recbox"><b>這位同學有 ${rs.length} 筆紀錄（重新登入過）。</b>每次登入都會新增一筆，舊資料都還在。程式關取「已完成且分數最高」的一筆；Lego Quest 取最完整的一筆。<ul>${rows}</ul></div>`;
+  }
+
   /** 個人報告裡的組裝：學生的 Lego Quest 紀錄 + 勾選等級 */
   function assemblySection(p) {
     const a = legoOf(p);
@@ -415,7 +443,8 @@
       const ls = legoStatus(a);
       const b = a.build;
       const dwell = b && b.stepDwellMs ? b.stepDwellMs.map((ms, i) => `<span class="dw" title="第 ${i + 1} 步">${i + 1}:${Math.round(ms / 1000)}s</span>`).join(' ') : '';
-      const ack = p.program && p.program.sub && p.program.sub.rulesAck;
+      const ackRec = (legoRecord(p) && legoRecord(p).sub.rulesAck) ? legoRecord(p) : (p.records || []).find((r) => r.sub.rulesAck);
+      const ack = ackRec && ackRec.sub.rulesAck;
       info = `<div class="bgbox"><b>Lego Quest：</b><span class="${ls.cls}">${esc(ls.text)}</span>${a.skipped ? '（老師跳過）' : ''}
         <div class="muted">考試說明：${ack ? `已確認「理解並能遵守」（${esc(new Date(ack.at).toLocaleTimeString('zh-TW'))}）` : '<span class="ng">沒有確認紀錄</span>'}</div>
         <div class="muted">看積木清單用了 ${a.count && a.count.durationMs != null ? mmss(a.count.durationMs) : '—'}（積木數量是學生自己檢查，缺件不補發）</div>
@@ -567,7 +596,7 @@
       </div>
       <p><button class="primary" data-act="save-items" ${disabled}>儲存評分項目</button></p>
 
-      <h2>程式關（自動評分）：總分 100 分，五個面向</h2>
+      <h2>程式關（自動評分）：總分 100 分，五個面向＋巧思加分</h2>
       <table><thead><tr><th></th><th>面向</th><th class="num">滿分</th><th>怎麼算</th></tr></thead><tbody>${dim}</tbody></table>
       <h2>第 1–8 關的權重與新概念</h2>
       <table><thead><tr><th class="num">關</th><th>名稱</th><th>新概念（觀念運用看這個）</th><th class="num">權重</th><th>對應能力</th></tr></thead><tbody>${lv}</tbody></table>
@@ -663,7 +692,7 @@
     const lvRows = sc.levels.map((l) => {
       const result = l.cleared ? `<span class="ok">過關</span> ${starsHtml(l.stars)}` : l.skipped ? '<span class="ng">跳過</span>' : l.visited ? '<span class="ng">未過</span>' : '<span class="muted">未玩</span>';
       const concept = l.cleared ? (l.usedConcept ? '<span class="ok">✓</span>' : '<span class="ng">✗</span>') : '';
-      return `<tr><td>${l.id}</td><td>${esc(l.title)}</td><td>${esc(l.concept)}</td><td>${result}</td><td>${concept}</td><td>${l.visited ? mmss(l.timeSpentMs) : ''}</td><td>${l.visited ? l.runs : ''}</td><td>${l.cleared ? l.blocks : ''}</td><td>${l.hint ? '有' : ''}</td><td>${(l.a + l.b + l.c).toFixed(1)}</td></tr>`;
+      return `<tr><td>${l.id}</td><td>${esc(l.title)}</td><td>${esc(l.concept)}</td><td>${result}</td><td>${concept}</td><td>${l.visited ? mmss(l.timeSpentMs) : ''}</td><td>${l.visited ? l.runs : ''}</td><td>${l.cleared ? l.blocks : ''}</td><td>${l.hint ? '有' : ''}</td><td>${(l.a + l.b + l.c).toFixed(1)}${l.f ? ` <span class="ok" title="巧思加分">+${l.f.toFixed(1)}</span>` : ''}</td></tr>`;
     }).join('');
     const h = sc.hidden;
     const hiddenHtml = h.visited
@@ -686,7 +715,7 @@
       <div class="muted">場次 ${esc(sub.sessionCode || 'default')}・${esc(sub.variantSeed || '')} 版・${pr.done ? '已完成' : '進行中'}・${esc(when)}${sc.adjust ? `・含加減分 ${sc.adjust > 0 ? '+' : ''}${sc.adjust}（原始 ${sc.raw}）` : ''}</div>
       <div class="comment" style="margin-top:8px">${esc(sc.comment)}</div>
       ${sc.flags.length ? `<ul class="flags">${sc.flags.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>` : ''}
-      <h4>五個面向</h4><div class="bars">${dimRows}</div>
+      <h4>五個面向（F 為額外加分）</h4><div class="bars">${dimRows}</div>
       <h4>六項能力（不計入總分）</h4><div class="bars">${skillRows}</div>
       <h4>各關表現</h4>
       <table class="lv"><thead><tr><th>關</th><th>名稱</th><th>新概念</th><th>結果</th><th>用到</th><th>用時</th><th>執行</th><th>積木</th><th>提示</th><th>得分</th></tr></thead><tbody>${lvRows}</tbody></table>
@@ -715,6 +744,7 @@
     $('drawer-inner').innerHTML = `
       <div class="d-head"><h2>${p.grade ? esc(p.grade) + ' 年 ' : ''}${esc(p.cls)} 班 ${p.seat} 號</h2><div class="spacer"></div>${total}</div>
       <div class="scards">${cards}</div>
+      ${recordsNote(p)}
       <div class="d-head" style="margin-top:12px"><label>最後決定
         <select id="d-decision" ${dis}><option value="">（未決定）</option><option value="pick">入選</option><option value="wait">候補</option><option value="drop">不錄取</option></select></label></div>
 
@@ -754,11 +784,11 @@
         .concat(list.map((p) => [p.cls, p.seat, p.s.assembly, p.s.program, p.s.interview, p.composite, p.complete ? '是' : '否', p.rank, dec[p.decision] || '', p.program ? p.program.sc.surveyText : '', potOf(p) && potOf(p).tier ? potOf(p).label : ''])));
     } else if (v === 'program') {
       const list = sortList(visible(state.people.filter((p) => p.program)), PG_COLS, state.sort.program);
-      const head = ['場次', '年級', '班級', '座號', '版本', '狀態', '名次', '過關數', '到達關卡', 'A關卡完成度', 'B解題品質', 'C觀念運用', 'D獨立思考', 'E隱藏關卡', '老師加減分', '總分', '等級', '建議', '老師備註', '積木經驗', '潛力']
+      const head = ['場次', '年級', '班級', '座號', '版本', '狀態', '名次', '過關數', '到達關卡', 'A關卡完成度', 'B解題品質', 'C觀念運用', 'D獨立思考', 'E隱藏關卡', 'F巧思加分', '老師加減分', '總分', '等級', '建議', '老師備註', '積木經驗', '潛力']
         .concat(SC.MAIN_IDS.map((i) => `第${i}關星等`), SC.SKILLS.map((s) => s.name));
       downloadCsv('機器人校隊選拔_程式.csv', [head].concat(list.map((p) => {
         const r = p.program, s = r.sc, sub = r.sub;
-        return [sub.sessionCode, sub.student.grade, p.cls, p.seat, sub.variantSeed, r.done ? '完成' : '進行中', p.rk.program, s.cleared, s.reached, s.dims.A, s.dims.B, s.dims.C, s.dims.D, s.dims.E, s.adjust, s.total, s.grade, s.pick, (r.review && r.review.note) || '', s.surveyText, s.potential.tier ? s.potential.label : '']
+        return [sub.sessionCode, sub.student.grade, p.cls, p.seat, sub.variantSeed, r.done ? '完成' : '進行中', p.rk.program, s.cleared, s.reached, s.dims.A, s.dims.B, s.dims.C, s.dims.D, s.dims.E, s.dims.F, s.adjust, s.total, s.grade, s.pick, (r.review && r.review.note) || '', s.surveyText, s.potential.tier ? s.potential.label : '']
           .concat(s.levels.map((l) => (l.cleared ? l.stars : l.visited ? '未過' : '未玩')), s.skills.map((k) => k.pct));
       })));
     } else if (v === 'assembly') {

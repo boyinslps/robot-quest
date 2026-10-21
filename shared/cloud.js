@@ -17,10 +17,12 @@
     onState: null,
   });
 
-  // 文件代號：場次__班級_座號（中文、英數保留，其他符號拿掉，避免 / 之類的字元）
-  cloud.docId = (session, cls, seat) => {
-    const clean = (s) => String(s).replace(/[^0-9A-Za-z\u4e00-\u9fff]/g, '');
-    return `${clean(session) || 'default'}__${clean(cls)}_${Number(seat)}`;
+  // 文件代號：場次__班級_座號__登入代碼（中文、英數保留，其他符號拿掉，避免 / 之類的字元）
+  // 登入代碼每次登入都不同，所以同一個班級座號再登入，會「新增一筆」，不會蓋掉前一筆。
+  // 沒給登入代碼就是舊格式（場次__班級_座號）：以前已經存在資料庫裡的資料就是這個格式。
+  cloud.docId = (session, cls, seat, attempt) => {
+    const clean = (s) => String(s).replace(/[^0-9A-Za-z一-鿿]/g, '');
+    return `${clean(session) || 'default'}__${clean(cls)}_${Number(seat)}` + (attempt ? `__${clean(attempt)}` : '');
   };
 
   function setState(s) {

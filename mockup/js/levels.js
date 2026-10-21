@@ -57,7 +57,7 @@
     {
       id: 2,
       title: '爬樓梯',
-      prompt: '積木只有 6 塊，讓機器人爬到終點',
+      prompt: '讓機器人爬到終點。積木用得越少，星星越多',
       mirror: 'h',
       maps: [{
         name: '',
@@ -72,11 +72,9 @@
         start: { r: 5, c: 0, dir: 'E' },
       }],
       blocks: ['move', 'left', 'right', 'repeat'],
-      blockLimit: 6,
-      limitMsg: '積木用完了，想想看有沒有一直重複的動作？',
       cards: ['repeat'],
-      hint: '找找看：有沒有一組動作一直重複出現？',
-      stars: { type: 'blocks', three: 5, two: 6 },
+      hint: '先一步一步走到終點也可以。再找找看：有沒有一組動作一直重複出現？',
+      stars: { type: 'blocks', three: 5, two: 8 }, // 沒有硬性上限：笨方法也能過（1 星），找到規律才有 3 星
     },
 
     // ---------- 3 旋轉 X 度（只加這一個新東西；取代向左轉／向右轉）----------
@@ -105,7 +103,7 @@
     {
       id: 4,
       title: '寶特瓶轉彎',
-      prompt: '前面有寶特瓶就右轉，積木只有 6 塊',
+      prompt: '前面有寶特瓶就右轉。積木用得越少，星星越多',
       mirror: 'h',
       maps: [{
         name: '',
@@ -119,11 +117,9 @@
       }],
       blocks: ['move', 'turn', 'repeat', 'ifelse', 'look'],
       look: { sides: ['front'], is: ['bottle'] },
-      blockLimit: 6,
-      limitMsg: '積木用完了，每個轉角前面都有寶特瓶，想想看能不能讓機器人自己判斷？',
       cards: ['ifelse'],
-      hint: '看地圖：每次要轉彎的地方，前面都有寶特瓶。',
-      stars: { type: 'blocks', three: 5, two: 6 },
+      hint: '看地圖：每次要轉彎的地方，前面都有寶特瓶。可以先用「往前走」和「旋轉」一格一格走，再想想怎麼讓機器人自己判斷。',
+      stars: { type: 'blocks', three: 5, two: 7 }, // 第一次用「判斷」，沒有硬性上限：一格一格走也能過（1 星），用判斷才有 3 星
     },
 
     // ---------- 5 夾取、放下（WRO 搬運；已經學過旋轉 X 度，所以用「旋轉」）----------
@@ -152,7 +148,7 @@
     {
       id: 6,
       title: '一直走到終點',
-      prompt: '積木只有 7 塊，讓機器人走到終點',
+      prompt: '讓機器人走到終點。積木用得越少，星星越多',
       mirror: 'h',
       maps: [{
         name: '',
@@ -165,18 +161,16 @@
         start: { r: 3, c: 0, dir: 'N' },
       }],
       blocks: ['move', 'turn', 'until'],
-      blockLimit: 7,
-      limitMsg: '積木用完了，想想看不用算要走幾格的方法？',
       cards: ['until'],
       hint: '最後那一長段不用數格子，讓機器人自己一直走到終點。',
-      stars: { type: 'blocks', three: 6, two: 7 },
+      stars: { type: 'blocks', three: 6, two: 9 },
     },
 
     // ---------- 7 倉庫配送（綜合：夾取＋一直做＋如果；偵測同時有牆壁和寶特瓶；新東西只有感測「牆」和「往前走 N 格」字卡）----------
     {
       id: 7,
       title: '倉庫配送',
-      prompt: '把貨物送到綠色放置區，再走到終點。積木只有 11 塊',
+      prompt: '把貨物送到綠色放置區，再走到終點。積木用得越少，星星越多',
       mirror: 'h',
       // 規律：每個轉角前面是牆（右轉）；放置區前面有寶特瓶（放下貨物、左轉）。全程只有一個寶特瓶，所以看到它就是放貨的地方。
       maps: [{
@@ -193,11 +187,9 @@
       }],
       blocks: ['moveN', 'turn', 'repeat', 'until', 'ifelse', 'if', 'look', 'grab', 'drop'],
       look: { sides: ['front'], is: ['wall', 'bottle'] },
-      blockLimit: 11,
-      limitMsg: '積木用完了，想想看怎麼讓機器人自己判斷？',
       cards: ['moven', 'wall'],
-      hint: '轉角前面是牆；放置區前面有寶特瓶。一個「如果」只能看一種東西。',
-      stars: { type: 'blocks', three: 10, two: 11 },
+      hint: '可以用「往前走 N 格」一段一段走；想少用積木，就讓機器人自己判斷：轉角前面是牆，放置區前面有寶特瓶。一個「如果」只能看一種東西。',
+      stars: { type: 'blocks', three: 10, two: 13 },
     },
 
     // ---------- 8 魔王關：修好它（除錯，兩個錯：一個空間、一個邏輯）----------
