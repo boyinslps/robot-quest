@@ -598,9 +598,9 @@
 
       <h2>程式關（自動評分）：總分 100 分，五個面向＋巧思加分</h2>
       <table><thead><tr><th></th><th>面向</th><th class="num">滿分</th><th>怎麼算</th></tr></thead><tbody>${dim}</tbody></table>
-      <h2>第 1–8 關的權重與新概念</h2>
+      <h2>第 1–9 關的權重與新概念</h2>
       <table><thead><tr><th class="num">關</th><th>名稱</th><th>新概念（觀念運用看這個）</th><th class="num">權重</th><th>對應能力</th></tr></thead><tbody>${lv}</tbody></table>
-      <p class="muted">權重合計 55，越後面的關卡越難，分數越高。星等：第 1、3 關看執行次數（一次過 3 星）；第 5 關程式較長，3 次內成功 3 星、6 次內 2 星；第 2、4、6、7 關看積木數；魔王關（第 8 關）看改動塊數。</p>
+      <p class="muted">權重合計 55，越後面的關卡越難，分數越高。星等：第 1、3 關看執行次數（一次過 3 星）；第 6 關程式較長，3 次內成功 3 星、6 次內 2 星；第 2、4、5、7、8 關看積木數（沒有上限，積木越少星越多，3 星另有巧思加分）；魔王關（第 9 關）看改動塊數。</p>
       <h2>程式關等級與建議</h2>
       <table><thead><tr><th>等級</th><th>分數</th><th>說明</th><th>建議</th></tr></thead><tbody>${gr}</tbody></table>
       <h2>六項能力（只供參考，不計入總分）</h2>
@@ -698,8 +698,8 @@
     const hiddenHtml = h.visited
       ? `練習地圖 ${h.completed ? '<span class="ok">過關</span>' : `<span class="ng">未過（走到 ${Math.round(100 * h.progress)}%）</span>`}；隱藏地圖 ${h.generalized ? '<span class="ok">過關（通用化）</span>' : '<span class="ng">未過</span>'}；${h.usesSensor ? '有用感測器' : '沒用感測器'}；${h.blocks} 塊積木${h.src === 'timeout' ? '（時間到自動交出）' : ''}。得分 ${(h.e1 + h.e2).toFixed(1)} / 15`
       : '<span class="muted">沒有進入隱藏關卡</span>';
-    const progHtml = [...sc.levels.map((l) => l.id), 9].filter((id) => programs[id] && programs[id].length).map((id) => {
-      const name = id === 9 ? '隱藏：循線挑戰' : `第 ${id} 關 ${SC.TITLES[id]}`;
+    const progHtml = [...sc.levels.map((l) => l.id), 10].filter((id) => programs[id] && programs[id].length).map((id) => {
+      const name = id === 10 ? '隱藏：循線挑戰' : `第 ${id} 關 ${SC.TITLES[id]}`;
       return `<details><summary>${esc(name)}（最後的程式）</summary><pre class="prog">${esc(SC.programText(programs[id]).join('\n'))}</pre></details>`;
     }).join('');
     const when = sub.finishedAt ? new Date(sub.finishedAt).toLocaleString('zh-TW') : sub.updatedAtMs ? '最後更新 ' + new Date(sub.updatedAtMs).toLocaleString('zh-TW') : '';
