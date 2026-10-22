@@ -1,12 +1,12 @@
 /* 座位表（顯示在考試說明頁，在規則旁邊）
  *
- * 電腦教室：4 排 × 每排 8 個座位，排是「直的」（每一排由前到後 8 個）。
+ * 電腦教室：4 排 × 每排 8 個座位，排是「直的」（每一排 8 個，座位由後往前編：最上方是投影螢幕＝教室前方，由下往上越來越大）。
  * 同學坐在第 2、3 排，每隔一個座位坐一人（隔開，避免偷看）；第 2、3 排的位置錯開，
  * 所以前後左右都沒有人緊鄰。班級由小到大依序入座：先填滿第 2 排，再填第 3 排。
  *
  * 想改人、改座位，只要改下面 RQ.SEATING：
  *   students：考生（只放班級與座號，不放姓名：這個網站是公開的）
- *   layout  ：每一排有哪些座位要坐人（座位從前到後 1–8）
+ *   layout  ：每一排有哪些座位要坐人（座位從後到前 1–8；圖上 1 號在最下面）
  *   front   ：'top' = 圖的上方是教室前方；'bottom' = 下方是前方
  *   reverse ：false = 第 1 排在最左邊；true = 第 1 排在最右邊
  */
@@ -55,7 +55,7 @@
     const rowOrder = Array.from({ length: c.rows }, (_, i) => i + 1);
     if (c.reverse) rowOrder.reverse();
     const seatOrder = Array.from({ length: c.seatsPerRow }, (_, i) => i + 1);
-    if (c.front === 'bottom') seatOrder.reverse();
+    if (c.front !== 'bottom') seatOrder.reverse(); // 座位由「後」往「前」編：前方在上方時，1 號在最下面，往上越來越大
 
     const cols = rowOrder.map((r) => {
       const cells = seatOrder.map((p) => {
