@@ -1,7 +1,7 @@
 /* 教師後台：三關（組裝、程式、面試）總覽，和單一關卡的全部學生成績與詳細表現
  *
  * 組裝、面試：老師手動輸入（可自訂評分項目）。程式：學生作答後自動評分（shared/scoring.js）。
- * 綜合成績 = 三關加權平均（權重可調，預設 1:1:1）；三關都有分數才排名。
+ * 綜合成績 = 三關各自 0–100 分，再依權重加總（預設 組裝 30％、程式 40％、面試 30％，可調）；三關都有分數才排名。
  * 資料讀寫在 store.js。
  */
 (function () {
@@ -17,6 +17,13 @@
   const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
   const parseNum = (v) => { if (v === '' || v === null || v === undefined) return null; const n = Number(v); return Number.isFinite(n) ? n : null; };
   const fmt = (n) => (n === null || n === undefined ? '—' : String(round1(n)));
+  // 權重換成百分比（合計 100）：三關各自 0–100 分，乘上百分比再加總就是綜合成績
+  const wPct = (W) => {
+    const sum = STAGES.reduce((a, s) => a + Math.max(0, Number(W[s.key]) || 0), 0);
+    const o = {};
+    STAGES.forEach((s) => { o[s.key] = sum ? round1((100 * Math.max(0, Number(W[s.key]) || 0)) / sum) : 0; });
+    return o;
+  };
 
   const STAGES = [
     { key: 'assembly', name: '組裝', manual: true },
@@ -32,7 +39,7 @@
     cls: '',
     q: '',
     bg: '', // 積木經驗篩選（只用在總覽、程式）
-    pickN: 0,
+    pickN: (() => { try { const v = localStorage.getItem('rqt_pickn'); return v === null ? 6 : Math.max(0, Number(v) || 0); } catch (e) { return 6; } })(), // 預計錄取人數（這次 8 人取 6 人）
     sort: {
       overview: { key: 'composite', dir: -1 },
       assembly: { key: 'cls', dir: 1 }, // 輸入分數時用班級座號排，不然列會跳來跳去
@@ -252,20 +259,38 @@
   function overviewHtml() {
     const list = sortList(visible(state.people), OV_COLS, state.sort.overview);
     const W = T.config.weights;
-    const wtxt = STAGES.map((s) => `${s.name} ${W[s.key]}`).join('：');
+    const P = wPct(W);
+    const wtxt = STAGES.map((s) => `${s.name} ${P[s.key]}%`).join('、');
     const body = list.map((p) => {
       const dec = DEC[p.decision];
       const top = state.pickN > 0 && p.rank && p.rank <= state.pickN;
-      const sug = dec ? `<span class="tag ${dec[1]}">${dec[0]}</span>` : top ? '<span class="tag star">★ 建議錄取</span>' : '';
+      const low = state.pickN > 0 && p.rank && p.rank > state.pickN;
+      const sug = dec ? `<span class="tag ${dec[1]}">${dec[0]}</span>` : top ? '<span class="tag star">★ 建議錄取</span>' : low ? '<span class="tag out">建議淘汰</span>' : '';
       const cell = (k) => {
         const s = p.s[k];
         if (k === 'program' && p.program && !p.program.done) return '<td class="num"><span class="tag live">進行中</span></td>';
         return `<td class="num ${s === null ? 'none' : ''}">${s === null ? '—' : fmt(s)}</td>`;
       };
       const comp = p.composite === null ? '—' : p.complete ? `<b>${fmt(p.composite)}</b>` : `<span class="partial" title="三關還沒齊，只是已有分數的平均">${fmt(p.composite)}（${p.haveN}/${p.needN}）</span>`;
-      return `<tr data-open="${esc(p.key)}" class="${top ? 'top-n' : ''}"><td class="num">${p.rank || '—'}</td><td>${esc(p.cls)}</td><td class="num">${p.seat}</td>${cell('assembly')}${cell('program')}${cell('interview')}<td class="num total">${comp}</td>${bgCell(p)}<td>${sug}</td></tr>`;
+      return `<tr data-open="${esc(p.key)}" class="${top ? 'top-n' : ''}${state.pickN > 0 && p.rank === state.pickN && state.sort.overview.key === 'composite' ? ' cut-line' : ''}"><td class="num">${p.rank || '—'}</td><td>${esc(p.cls)}</td><td class="num">${p.seat}</td>${cell('assembly')}${cell('program')}${cell('interview')}<td class="num total">${comp}</td>${bgCell(p)}<td>${sug}</td></tr>`;
     }).join('');
-    return `<div class="bar-actions"><span class="muted">綜合 = 三關加權平均（權重 ${esc(wtxt)}，可在「評分標準」調整）；三關都有分數才排名。點一列看個人報告。</span><div class="spacer"></div><button data-act="csv">匯出 CSV</button></div>
+    // 邊界提示：名次只是參考，分數接近的人由老師看個人報告決定（這次 8 人取 6 人）
+    const ranked = state.people.filter((p) => p.rank).sort((a, b) => a.rank - b.rank);
+    const picked = state.people.filter((p) => p.decision === 'pick').length;
+    const unfinished = state.people.filter((p) => !p.complete).length;
+    let cutNote = '';
+    if (state.pickN > 0) {
+      const parts = [`預計錄取 ${state.pickN} 人，已決定入選 ${picked} 人`];
+      if (ranked.length > state.pickN) {
+        const a = ranked[state.pickN - 1], b = ranked[state.pickN];
+        const gap = round1(a.composite - b.composite);
+        parts.push(`金色線以上是名次前 ${state.pickN}：第 ${a.rank} 名（${esc(a.cls)}-${a.seat}，${fmt(a.composite)} 分）和第 ${b.rank} 名（${esc(b.cls)}-${b.seat}，${fmt(b.composite)} 分）${gap === 0 ? '同分' : `只差 ${gap} 分`}${gap <= 3 ? '，分數很接近，建議看個人報告與面試表現再決定' : ''}`);
+      }
+      if (unfinished) parts.push(`還有 ${unfinished} 人三關未齊，未列入名次`);
+      cutNote = `<p class="cutnote">${parts.join('；')}。分數只是參考，最後以個人報告裡的「最後決定」為準。</p>`;
+    }
+    return `<div class="bar-actions"><span class="muted">綜合 = 三關各自 100 分再加權（${esc(wtxt)}，可在「評分標準」調整）；三關都有分數才排名。點一列看個人報告。</span><div class="spacer"></div><button data-act="csv">匯出 CSV</button></div>
+      ${cutNote}
       <div class="table-wrap"><table><thead>${thead(OV_COLS, 'overview')}</thead><tbody>${body}</tbody></table></div>
       ${list.length ? '' : `<p class="muted pad">${state.people.length ? '沒有符合篩選條件的資料。' : '還沒有資料。到「組裝」或「面試」分頁新增學生並輸入分數，或讓學生用連結作答程式關。'}</p>`}`;
   }
@@ -574,16 +599,19 @@
 
   function rubricHtml() {
     const W = T.config.weights;
-    const wIn = STAGES.map((s) => `<label>${s.name} <input type="number" min="0" max="10" step="0.5" data-w="${s.key}" value="${Number(W[s.key])}" style="width:70px"></label>`).join('　');
+    const P = wPct(W);
+    const wIn = STAGES.map((s) => `<label>${s.name} <input type="number" min="0" max="100" step="1" data-w="${s.key}" value="${Number(W[s.key])}" style="width:70px"> %</label>`).join('　');
+    const wSum = STAGES.reduce((a, s) => a + Math.max(0, Number(W[s.key]) || 0), 0);
+    const wEx = STAGES.map((s) => `${s.name} 90 分 × ${P[s.key]}% = ${round1(90 * P[s.key] / 100)}`).join('，');
     const itemTxt = (st) => T.config.items[st].map((i) => `${i.name},${i.max}`).join('\n');
     const dim = SC.DIMENSIONS.map((d) => `<tr><td><b>${d.key}</b></td><td>${esc(d.name)}</td><td class="num">${d.max}</td><td>${esc(d.desc)}</td></tr>`).join('');
     const lv = SC.MAIN_IDS.map((i) => `<tr><td class="num">${i}</td><td>${esc(SC.TITLES[i])}</td><td>${esc(SC.LEVELS[i].concept)}</td><td class="num">${SC.LEVELS[i].weight}</td><td>${SC.LEVELS[i].skills.map((k) => esc(SC.SKILLS.find((s) => s.key === k).name)).join('、')}</td></tr>`).join('');
     const gr = SC.GRADES.map((g, i) => `<tr><td><span class="grade g-${g.grade}">${g.grade}</span></td><td>${g.min}${i === 0 ? ' ~ 100' : ` ~ ${SC.GRADES[i - 1].min - 1}`}</td><td>${esc(g.label)}</td><td>${esc(g.pick)}</td></tr>`).join('');
     const disabled = T.canEdit() ? '' : 'disabled';
     return `<div id="rubric">
-      <h2>綜合成績（三關加權平均）</h2>
-      <p>綜合 = 組裝、程式、面試的加權平均，滿分 100。權重為 0 的關卡不列入。三關（權重 &gt; 0）都有分數才排名。</p>
-      <p>${wIn} <button class="primary" data-act="save-weights" ${disabled}>儲存權重</button></p>
+      <h2>綜合成績：三關各自 100 分，再依權重加總</h2>
+      <p>組裝、程式、面試<b>各自都是 0–100 分</b>，乘上權重（百分比）後相加，就是綜合成績（滿分 100）。預設 <b>組裝 30％、程式 40％、面試 30％</b>。權重為 0 的關卡不列入；三關（權重 &gt; 0）都有分數才排名。例如三關都是 90 分：${esc(wEx)}。</p>
+      <p>${wIn} <button class="primary" data-act="save-weights" ${disabled}>儲存權重</button>　<span class="muted">目前合計 ${wSum}${wSum === 100 ? '' : '（不是 100 也會自動換算成百分比：' + esc(STAGES.map((s) => s.name + ' ' + P[s.key] + '%').join('、')) + '）'}</span></p>
 
       <h2>組裝（Lego Quest）：老師勾選等級</h2>
       <p>學生拼完吉他後，老師檢查作品，勾選下面其中一個等級，分數就固定了。用時、翻頁與放大次數只給老師參考，不計分。分數可以在 <code>shared/assembly-scoring.js</code> 的 <code>GRADES</code> 調整。</p>
@@ -625,7 +653,7 @@
 
   function saveWeights() {
     const w = {};
-    document.querySelectorAll('[data-w]').forEach((i) => { const n = parseNum(i.value); w[i.dataset.w] = n === null ? 1 : clamp(n, 0, 10); });
+    document.querySelectorAll('[data-w]').forEach((i) => { const n = parseNum(i.value); w[i.dataset.w] = n === null ? 0 : clamp(n, 0, 100); });
     if (!Object.values(w).some((x) => x > 0)) { toast('至少要有一關的權重大於 0', true); return; }
     guard(T.saveConfig({ ...T.config, weights: w }), '權重已儲存 ✓');
   }
@@ -732,10 +760,12 @@
     const p = state.byKey.get(state.openKey);
     if (!p) { closeDrawer(); return; }
     const W = T.config.weights;
+    const P = wPct(W);
     const cards = STAGES.map((s) => {
       const v = p.s[s.key];
       const live = s.key === 'program' && p.program && !p.program.done;
-      return `<div class="scard"><span>${s.name}${Number(W[s.key]) !== 1 ? `（權重 ${W[s.key]}）` : ''}</span><b>${live ? '進行中' : fmt(v)}</b><small>${p.rk[s.key] ? `第 ${p.rk[s.key]} 名` : ''}</small></div>`;
+      const pts = v !== null && !live && Number(W[s.key]) > 0 ? `<small>× ${P[s.key]}% = ${fmt(v * P[s.key] / 100)} 分</small>` : '';
+      return `<div class="scard"><span>${s.name}（占 ${P[s.key]}%）</span><b>${live ? '進行中' : fmt(v)}</b><small>${p.rk[s.key] ? `第 ${p.rk[s.key]} 名` : ''}</small>${pts}</div>`;
     }).join('');
     const dis = T.canEdit() ? '' : 'disabled';
     const total = p.complete
@@ -824,7 +854,8 @@
   $('f-class').onchange = (e) => { state.cls = e.target.value; render(true); };
   $('f-bg').onchange = (e) => { state.bg = e.target.value; render(true); };
   $('f-q').oninput = (e) => { state.q = e.target.value; render(true); };
-  $('f-pick').oninput = (e) => { state.pickN = Math.max(0, Number(e.target.value) || 0); render(true); };
+  $('f-pick').value = state.pickN;
+  $('f-pick').oninput = (e) => { state.pickN = Math.max(0, Number(e.target.value) || 0); try { localStorage.setItem('rqt_pickn', String(state.pickN)); } catch (x) { /* 忽略 */ } render(true); };
 
   $('view').addEventListener('click', (e) => {
     const th = e.target.closest('th[data-sort]');

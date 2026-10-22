@@ -17,7 +17,7 @@
   const clean = (s) => String(s === undefined || s === null ? '' : s).replace(/[^0-9A-Za-z一-鿿]/g, '');
 
   const DEFAULT_CONFIG = {
-    weights: { assembly: 1, program: 1, interview: 1 },
+    weights: { assembly: 30, program: 40, interview: 30 }, // 百分比：三關各自 0–100 分，再依權重加總（舊版預設 1:1:1 會自動換成這組）
     items: { assembly: [], interview: [] }, // [{name, max}]；空 = 直接輸入 0–100 分
   };
 
@@ -65,8 +65,11 @@
     if (c) T.config = mergeConfig(c);
   }
   function mergeConfig(c) {
+    let w = { ...DEFAULT_CONFIG.weights, ...((c && c.weights) || {}) };
+    // 舊版預設是 1:1:1（沒有人手動設定過）→ 換成新預設 組裝 30／程式 40／面試 30
+    if (['assembly', 'program', 'interview'].every((k) => Number(w[k]) === 1)) w = { ...DEFAULT_CONFIG.weights };
     return {
-      weights: { ...DEFAULT_CONFIG.weights, ...((c && c.weights) || {}) },
+      weights: w,
       items: { assembly: (c && c.items && c.items.assembly) || [], interview: (c && c.items && c.items.interview) || [] },
     };
   }
