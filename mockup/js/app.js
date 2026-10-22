@@ -647,12 +647,6 @@
     const unlock = S.idx === BOSS && HIDDEN >= 0;
     const nextLabel = unlock ? '挑戰隱藏關卡' : S.idx === BOSS ? '完成' : '下一關';
     const actions = [{ label: nextLabel + RQ.icon('next', 20), primary: true, fn: () => { log('next_level'); nextLevel('cleared'); } }];
-    if (rule.type === 'blocks' && stars < 3) {
-      actions.unshift({
-        label: '再挑戰更少積木',
-        fn: () => { res.retryForStars++; log('retry_for_stars'); closeOverlay(); stopPlayback(); resetView(); status(''); },
-      });
-    }
     let extra = '';
     if (S.idx === 0) extra = '<p>接下來是正式的關卡。</p>';
     if (unlock) extra = '<p><b>你打倒魔王了！發現了一個隱藏關卡。</b></p>';

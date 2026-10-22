@@ -9,7 +9,7 @@
  *
  * 額外加分（不佔那 100 分，最多 +10）：
  *   F 巧思加分　　積木沒有上限，笨方法也能過關；但「聰明的寫法」（積木數達 3 星）的關卡額外加分，
- *               只算有 smart 標記的關卡（2、4、6、7、8、9），按權重分配。總分最高仍是 100。
+ *               只算有 smart 標記的關卡（2、3、6、7、8、9），按權重分配。總分最高仍是 100。
  *
  * 另外算六項「能力」百分比，給老師看每個人強在哪、弱在哪（不影響總分）。
  * 老師可以在後台對個人加減分（review.adjust）、寫備註、標記入選與否。
@@ -42,10 +42,10 @@
   // concept：這關要學的新積木，最後的程式有用到才算「觀念運用」
   const LEVELS = {
     1: { weight: 3, skills: ['sequence'], concept: '向左／向右轉', used: (p) => hasType(p, 'left') || hasType(p, 'right') },
-    2: { weight: 4, smart: true, skills: ['loop'], concept: '重複 N 次', used: (p) => hasType(p, 'repeat') },
-    // 權重跟著「第幾關」走（越後面越高），不跟著概念走；第 3–7 關：旋轉 → 繞一圈（重複一組動作）→ 搬運 → 一直做 → 如果
-    3: { weight: 4, skills: ['sequence'], concept: '旋轉 X 度', used: (p) => hasType(p, 'turn') },
-    4: { weight: 4, smart: true, skills: ['loop', 'abstraction'], concept: '重複一組動作（找規律）', used: (p) => has(p, (n) => n.t === 'repeat' && hasType(n.body, 'turn')) },
+    2: { weight: 4, smart: true, skills: ['loop', 'abstraction'], concept: '重複 N 次（找規律）', used: (p) => has(p, (n) => n.t === 'repeat' && (hasType(n.body, 'left') || hasType(n.body, 'right') || hasType(n.body, 'turn'))) },
+    3: { weight: 4, smart: true, skills: ['loop'], concept: '重複一組動作（爬樓梯）', used: (p) => hasType(p, 'repeat') },
+    // 權重跟著「第幾關」走（越後面越高），不跟著概念走；第 2–7 關：繞一圈（重複）→ 爬樓梯 → 旋轉 → 搬運 → 一直做 → 如果
+    4: { weight: 4, skills: ['sequence'], concept: '旋轉 X 度', used: (p) => hasType(p, 'turn') },
     5: { weight: 5, skills: ['loop', 'sequence'], concept: '夾取＋放下', used: (p) => hasType(p, 'grab') && hasType(p, 'drop') },
     6: { weight: 6, smart: true, skills: ['loop', 'abstraction'], concept: '一直做直到終點', used: (p) => hasType(p, 'until') },
     7: { weight: 6, smart: true, skills: ['condition', 'sensor', 'loop'], concept: '如果…就…（偵測寶特瓶）', used: (p) => has(p, (n) => n.t === 'if' && n.cond && n.cond.t === 'look') },
@@ -59,7 +59,7 @@
     },
     9: { weight: 13, smart: true, skills: ['debug', 'condition'], concept: '精準除錯（不是整段重寫）', used: null },
   };
-  const TITLES = { 1: '轉個彎', 2: '爬樓梯', 3: '旋轉 X 度', 4: '繞一圈', 5: '搬運任務', 6: '一直走到終點', 7: '寶特瓶轉彎', 8: '倉庫配送', 9: '修好它（魔王關）' };
+  const TITLES = { 1: '轉個彎', 2: '繞一圈', 3: '爬樓梯', 4: '旋轉 X 度', 5: '搬運任務', 6: '一直走到終點', 7: '寶特瓶轉彎', 8: '倉庫配送', 9: '修好它（魔王關）' };
   const MAIN_IDS = Object.keys(LEVELS).map(Number);
   const WEIGHT_SUM = MAIN_IDS.reduce((s, i) => s + LEVELS[i].weight, 0); // 55
   const BONUS_MAX = 10;
@@ -71,7 +71,7 @@
     { key: 'C', name: '觀念運用', max: 10, desc: '已過關的關卡，最後交出的程式有用到這關要學的新積木（魔王關看有沒有整段重寫）。' },
     { key: 'D', name: '獨立思考', max: 5, desc: '沒有開「提示」就過關的關卡數 ÷ 9。' },
     { key: 'E', name: '隱藏關卡', max: 15, desc: '循線挑戰：練習地圖過關 7 分（沒過但有走一段按比例給 ≤4 分）＋通用化 8 分（隱藏地圖也過；沒過但有用感測器給 2 分）。' },
-    { key: 'F', name: '巧思加分', max: 10, bonus: true, desc: '額外加分，總分最高仍是 100。積木沒有上限，但第 2、4、6、7、8、9 關用聰明的寫法（積木數達 3 星）過關，按關卡權重分配最多 +10。' },
+    { key: 'F', name: '巧思加分', max: 10, bonus: true, desc: '額外加分，總分最高仍是 100。積木沒有上限，但第 2、3、6、7、8、9 關用聰明的寫法（積木數達 3 星）過關，按關卡權重分配最多 +10。' },
   ];
 
   const SKILLS = [
