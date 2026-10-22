@@ -105,6 +105,12 @@
       el('polygon', { points: `0,${-S * 0.46} ${-S * 0.17},${-S * 0.25} ${S * 0.17},${-S * 0.25}`, fill: '#e0a526', stroke: '#8a6414', 'stroke-width': 1.5 }, body);
       this.held = this._crate(body, 0, -S * 0.5, false, 0.55);
       this.held.style.display = 'none';
+      if (this.badge) this.badge.style.display = 'none';
+      // 背上的數字：夾著幾個貨物（跟著機器人轉，但數字保持正向）
+      this.badge = el('g', {}, body);
+      el('circle', { cx: 0, cy: 0, r: S * 0.19, fill: '#e0a526', stroke: '#8a6414', 'stroke-width': 1.5 }, this.badge);
+      this.badgeText = el('text', { x: 0, y: S * 0.09, 'text-anchor': 'middle', 'font-size': S * 0.26, 'font-weight': 700, fill: '#2b2412', 'font-family': 'sans-serif' }, this.badge);
+      this.badge.style.display = 'none';
 
       this.reset(true);
     }
@@ -129,6 +135,7 @@
       this.robot.style.transition = dur ? `transform ${dur}ms ease-in-out` : 'none';
       this.robot.style.transform = `translate(${cx(c)}px, ${cy(r)}px) rotate(${this.angle}deg)`;
       this.pos = [r, c];
+      if (this.badge) this.badge.setAttribute('transform', `translate(0 ${S * 0.02}) rotate(${-this.angle})`);
     }
 
     reset(instant) {
@@ -138,6 +145,7 @@
       this._place(s.r, s.c, this.dir, 0);
       Object.values(this.items).forEach((g) => (g.style.display = ''));
       this.held.style.display = 'none';
+      if (this.badge) this.badge.style.display = 'none';
       this.delivered.style.display = 'none';
       this.dropped.style.display = 'none';
       this.robot.classList.remove('shake', 'jump');
@@ -160,6 +168,9 @@
     _items(state) {
       Object.entries(this.items).forEach(([k, g]) => (g.style.display = state.items.includes(k) ? '' : 'none'));
       this.held.style.display = state.holding ? '' : 'none';
+      const n = state.carried !== undefined ? state.carried : state.holding ? 1 : 0;
+      this.badge.style.display = n > 0 ? '' : 'none';
+      this.badgeText.textContent = String(n);
       if (state.delivered > 0) {
         const z = this._findChar('Z');
         if (z) {

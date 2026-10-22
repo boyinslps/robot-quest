@@ -3,7 +3,7 @@
   'use strict';
 
   const SIDE_LABEL = { front: '前方', left: '左方', right: '右方' };
-  const IS_LABEL = { wall: '是牆', line: '是黑線', bottle: '有寶特瓶' };
+  const IS_LABEL = { wall: '是牆', line: '是黑線', bottle: '有寶特瓶', cargo: '有貨物' };
   const COLOR_LABEL = { red: '紅色', green: '綠色', blue: '藍色' };
 
   // 下拉選單依關卡開放的選項變動

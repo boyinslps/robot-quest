@@ -643,9 +643,7 @@
     S.programs[S.idx] = RQ.stripIds(s.prog);
     log('level_clear', { stars, blocks: s.n, runs: res.runs });
 
-    const starHtml = stars
-      ? `<div class="stars">${[1, 2, 3].map((k) => `<span class="${k <= stars ? 'on' : ''}">${RQ.icon('star', 64)}</span>`).join('')}</div>`
-      : '';
+    const starHtml = ''; // 過關畫面不顯示星星數（星等只給老師後台看）
     const unlock = S.idx === BOSS && HIDDEN >= 0;
     const nextLabel = unlock ? '挑戰隱藏關卡' : S.idx === BOSS ? '完成' : '下一關';
     const actions = [{ label: nextLabel + RQ.icon('next', 20), primary: true, fn: () => { log('next_level'); nextLevel('cleared'); } }];

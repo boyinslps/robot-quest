@@ -14,7 +14,7 @@
  *   {repeat: n, do: [...]}
  *   {until: [...]}                               一直做，直到到達終點
  *   {if: 條件, then: [...], else: [...]}         else 省略 = 只有「如果…就…」
- *   條件：{look: 'front'|'left'|'right', is: 'wall'|'line'|'bottle'} 或 {floor: 'red'|'green'|'blue'}
+ *   條件：{look: 'front'|'left'|'right', is: 'wall'|'line'|'bottle'|'cargo'} 或 {floor: 'red'|'green'|'blue'}
  */
 (function (RQ) {
   'use strict';
@@ -28,7 +28,7 @@
     bottle: '機器人撞倒寶特瓶了',
     end_not_goal: '程式跑完了，但機器人還沒到終點',
     passed_goal: '機器人經過了終點，但沒有停在終點',
-    mission_incomplete: '機器人到終點了，但貨物還沒送到放置區',
+    mission_incomplete: '機器人到終點了，但貨物還沒處理完（放進放置區／全部夾完）',
     too_long: '機器人走太久了，好像一直在繞圈',
     idle_loop: '程式一直重複，但機器人都沒有動',
     no_item: '這裡沒有貨物可以夾',
@@ -239,7 +239,7 @@
     map.grid.forEach((row, r) => row.split('').forEach((ch, c) => { if (ch === 'O') items.add(r + ',' + c); }));
     const totalItems = items.size;
 
-    const st = { r: map.start.r, c: map.start.c, dir: dirIndex(map.start.dir), holding: false, delivered: 0 };
+    const st = { r: map.start.r, c: map.start.c, dir: dirIndex(map.start.dir), holding: false, carried: 0, delivered: 0 };
     const d0 = dist[st.r + ',' + st.c] || 1;
     let best = 0;
     const trace = [];
@@ -248,7 +248,7 @@
     let passedGoal = false;
     let fail = null;
 
-    const snap = () => ({ r: st.r, c: st.c, dir: st.dir, holding: st.holding, delivered: st.delivered, items: [...items] });
+    const snap = () => ({ r: st.r, c: st.c, dir: st.dir, holding: st.holding, carried: st.carried, delivered: st.delivered, items: [...items] });
     const here = () => charAt(map, st.r, st.c);
     const atGoal = () => isGoalCh(here());
 
@@ -284,6 +284,7 @@
       if (cond.is === 'wall') value = isWallCh(ch);
       else if (cond.is === 'line') value = isLineCh(ch);
       else if (cond.is === 'bottle') value = ch === 'B';
+      else if (cond.is === 'cargo') value = items.has(r + ',' + c);
       return { value, cell: [r, c] };
     }
 
@@ -320,11 +321,16 @@
         }
         case 'grab': {
           action();
-          const k = st.r + ',' + st.c;
-          if (st.holding) halt('already_holding', { kind: 'grab', id: n.id, state: snap(), failed: true });
-          if (!items.has(k)) halt('no_item', { kind: 'grab', id: n.id, state: snap(), failed: true });
+          // 收集模式（map.collect）：夾爪在前方，腳下或前面那一格的貨物都夾得到；可以一直夾，不用放下
+          const here = st.r + ',' + st.c;
+          const ahead = (st.r + DR[st.dir]) + ',' + (st.c + DC[st.dir]);
+          const k = items.has(here) ? here : map.collect && items.has(ahead) ? ahead : null;
+          if (st.holding && !map.collect) halt('already_holding', { kind: 'grab', id: n.id, state: snap(), failed: true });
+          if (k === null) halt('no_item', { kind: 'grab', id: n.id, state: snap(), failed: true });
           items.delete(k);
           st.holding = true;
+          st.carried = map.collect ? st.carried + 1 : 1;
+          if (map.collect) st.delivered++;
           trace.push({ kind: 'grab', id: n.id, state: snap() });
           break;
         }
@@ -332,6 +338,7 @@
           action();
           if (!st.holding) halt('empty_hand', { kind: 'drop', id: n.id, state: snap(), failed: true });
           st.holding = false;
+          st.carried = 0;
           if (here() !== 'Z') halt('wrong_zone', { kind: 'drop', id: n.id, state: snap(), failed: true, droppedAt: [st.r, st.c] });
           st.delivered++;
           trace.push({ kind: 'drop', id: n.id, state: snap() });
@@ -383,7 +390,7 @@
   function startState(map) {
     const items = [];
     map.grid.forEach((row, r) => row.split('').forEach((ch, c) => { if (ch === 'O') items.push(r + ',' + c); }));
-    return { r: map.start.r, c: map.start.c, dir: dirIndex(map.start.dir), holding: false, delivered: 0, items };
+    return { r: map.start.r, c: map.start.c, dir: dirIndex(map.start.dir), holding: false, carried: 0, delivered: 0, items };
   }
 
   RQ.startState = startState;
