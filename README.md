@@ -84,12 +84,16 @@ lego quest/         Lego Quest 的規格書、原始 PDF 與壓縮檔（原始�
 - 右側：模擬場地（6 種：空白、尺規、循線、顏色區、迷宮、可拖曳障礙物）、主機（5×5 燈光矩陣）與 A～F 埠裝置（C～F 可選顏色／距離／力感測器）、訊息欄。
 - 物理：輪徑 5.6 cm、輪距 11.2 cm、3 px = 1 cm；距離感測器用 5 條射線偵測；顏色感測器讀場地底圖像素；轉向角度順時針為正。
 - 每個「當…」積木是獨立執行緒，可同時執行；有我的積木、傳送／接收訊息、計時器事件；支援儲存／開啟 .json 與自動保存。
+- **積木 ↔ Python 切換**：上方「積木／Python」切換；積木會轉成 SPIKE App 3 風格的 Python（`hub`、`motor_pair`、`color_sensor`、`runloop`…），Python 可直接修改並在模擬器執行（Pyodide，第一次載入約 10 MB，需要網路）。Python 改過後不會變回積木。
+- **報錯台**：執行前檢查積木（沒有事件積木、埠不符、缺條件、孤立積木），執行時的錯誤（含 Python 錯誤，翻成中文並標出第幾行）會列在報錯台，點一下跳到積木或程式行。
 - 首頁（新專案、繼續、開啟檔案、4 個範例專案）；「機器人設定」可校正輪徑、輪距、轉向角度方向，並可開啟「真實模式」（馬達加減速、兩輪 ±1% 誤差）。
 
 | 檔案 | 用途 |
 |---|---|
 | `spike-sim/sim.js` | 物理、感測器、場景、積木呼叫的 API |
-| `spike-sim/blocks.js` | 積木定義、程式產生器、工具箱、配色與圖示 |
+| `spike-sim/blocks.js` | 積木定義、JavaScript 程式產生器、工具箱、配色與圖示 |
+| `spike-sim/pygen.js` | 積木 → Python 產生器 |
+| `spike-sim/pyrun.js` | Pyodide 執行環境與 SPIKE Python API 子集、Python 錯誤解析 |
 | `spike-sim/app.js`、`style.css`、`index.html` | 介面與執行流程 |
 
 ## Lego Quest（實體積木組裝）

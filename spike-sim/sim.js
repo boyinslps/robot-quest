@@ -5,7 +5,7 @@
   'use strict';
   const PX = 3, W = 300, H = 200, DT = 0.01;
   const WHEEL_D = 5.6, TRACK = 11.2, HL = 8, HW = 6;
-  const STOP = { stop: true };
+  const STOP = Object.assign(new Error('程式已停止'), { stop: true });
   const rad = (d) => d * Math.PI / 180;
 
   const mc = new MessageChannel(); const mq = [];
@@ -94,7 +94,7 @@
       this.trail = document.createElement('canvas'); this.trail.width = W * PX; this.trail.height = H * PX;
       this.mL = { dps: 0, deg: 0 }; this.mR = { dps: 0, deg: 0 };
       this.simTime = 0; this.timerOff = 0; this.yawOff = 0; this.lastMoveT = 0;
-      this.waiters = []; this.acc = 0; this.mul = 1; this.pumping = false;
+      this.waiters = []; this.pending = 0; this.acc = 0; this.mul = 1; this.pumping = false;
       this.penOn = true; this.showSensors = true; this.display = ''; this.onDisplay = null;
       this.speedPct = 50; this.msgs = {};
       this.wheelD = WHEEL_D; this.track = TRACK; this.real = false; this.yawSign = 1; this.scaleL = 1; this.scaleR = 1;
@@ -172,11 +172,11 @@
         }
       }
       this.x = nx; this.y = ny; this.th = nth; this.simTime += DT;
-      let any = false;
+      let any = 0;
       for (const w of this.waiters.slice()) {
         let ok = false;
-        try { ok = w.pred(); } catch (e) { this.waiters.splice(this.waiters.indexOf(w), 1); w.rej(e); any = true; continue; }
-        if (ok) { this.waiters.splice(this.waiters.indexOf(w), 1); w.res(); any = true; }
+        try { ok = w.pred(); } catch (e) { this.waiters.splice(this.waiters.indexOf(w), 1); w.rej(e); any++; continue; }
+        if (ok) { this.waiters.splice(this.waiters.indexOf(w), 1); w.res(); any++; }
       }
       return any;
     }
@@ -186,11 +186,17 @@
       try {
         while (this.acc >= DT) {
           this.acc -= DT;
-          if (this.step()) await macroYield();
+          const n = this.step();
+          if (n) {
+            // 鎖步：等被喚醒的程式（含 Python 的事件迴圈）真的接續執行、重新等待之後，才推進下一個模擬步驟
+            this.pending += n; const t0 = performance.now();
+            do { await macroYield(); } while (this.pending > 0 && performance.now() - t0 < 40);
+            this.pending = 0;
+          }
         }
       } finally { this.pumping = false; }
     }
-    waitUntil(pred) { return new Promise((res, rej) => { this.waiters.push({ pred, res, rej }); }); }
+    waitUntil(pred) { if (this.pending > 0) this.pending--; return new Promise((res, rej) => { this.waiters.push({ pred, res, rej }); }); }
     abort() { const ws = this.waiters; this.waiters = []; ws.forEach((w) => w.rej(STOP)); this.stopAll(); }
     stalled() { return this.simTime - this.lastMoveT > 1.5; }
 
@@ -208,7 +214,9 @@
     }
     color() { const [r, g, b] = this.pixel(); return classify(r, g, b); }
     light() { const [r, g, b] = this.pixel(); return Math.round((0.299 * r + 0.587 * g + 0.114 * b) / 2.55); }
-    distance() {
+    distance() { return Math.round(this.distRaw()); }
+    distanceMm() { const d = this.distRaw(); return d >= 200 ? -1 : Math.round(d * 10); }
+    distRaw() {
       const [ox, oy] = this.local(0, -HL);
       let best = 200;
       for (let k = -2; k <= 2; k++) {
@@ -217,7 +225,7 @@
         for (const r of this.rects) t = Math.min(t, rayRect(ox, oy, dx, dy, r));
         best = Math.min(best, t);
       }
-      return Math.round(best);
+      return best;
     }
     pressed() {
       for (const lx of [-3, 0, 3]) { const [px, py] = this.local(lx, -(HL + 1)); if (this.hit(px, py)) return true; }
@@ -321,8 +329,9 @@
         sim.drive(sp * (st > 0 ? 1 : 1 + st / 50), sp * (st < 0 ? 1 : 1 - st / 50));
       },
       stop() { sim.stopAll(); },
-      async motorTurn(port, deg) {
-        deg = num(deg); const m = port === 'A' ? sim.mL : sim.mR, sp = sim.speedPct; if (!sp || !deg) return;
+      async motorTurn(port, deg) { return this.motorTurnAt(port, deg, sim.speedPct); },
+      async motorTurnAt(port, deg, sp) {
+        deg = num(deg); sp = Math.abs(num(sp)); const m = port === 'A' ? sim.mL : sim.mR; if (!sp || !deg) return;
         const d0 = m.deg, dir = Math.sign(deg); sim.lastMoveT = sim.simTime;
         await sim.waitUntil(() => {
           const rem = Math.abs(deg) - dir * (m.deg - d0);
@@ -331,6 +340,31 @@
         });
         m.dps = 0;
       },
+      // 馬達組：按「馬達轉的度數」或「時間」移動（Python 模式使用）
+      async moveDegrees(deg, steer, pct) {
+        deg = Math.abs(num(deg)); pct = clamp(pct); steer = clamp(steer); if (!pct || !deg) return;
+        const l = pct * (steer > 0 ? 1 : 1 + steer / 50), r = pct * (steer < 0 ? 1 : 1 - steer / 50);
+        const big = Math.max(Math.abs(l), Math.abs(r)), d0 = [sim.mL.deg, sim.mR.deg]; sim.lastMoveT = sim.simTime;
+        await sim.waitUntil(() => {
+          const done = Math.max(Math.abs(sim.mL.deg - d0[0]), Math.abs(sim.mR.deg - d0[1]));
+          const rem = deg - done;
+          if (rem <= 0.3 || sim.stalled()) return true;
+          const k = Math.min(1, Math.max(0.04, rem * 0.05 / (big / 10 || 1))); sim.drive(l * k, r * k); return false;
+        });
+        sim.stopAll();
+      },
+      async moveTime(ms, steer, pct) {
+        pct = clamp(pct); steer = clamp(steer);
+        sim.drive(pct * (steer > 0 ? 1 : 1 + steer / 50), pct * (steer < 0 ? 1 : 1 - steer / 50));
+        await wait(num(ms) / 1000); sim.stopAll();
+      },
+      tank(l, r) { sim.drive(clamp(l), clamp(r)); },
+      motorSetPos(p, v) { (p === 'A' ? sim.mL : sim.mR).deg = num(v); },
+      distMm: (p) => { need(p, 'distance'); return sim.distanceMm(); },
+      colorKey: (p) => { need(p, 'color'); return sim.color(); },
+      yawDeci: () => sim.yaw() * 10,
+      ticksMs: () => Math.round(sim.simTime * 1000),
+      stopSim() { sim.abort(); },
       motorStart(port, p) { const v = clamp(p) * 10; if (port === 'A' || port === 'AB') sim.mL.dps = v; if (port === 'B' || port === 'AB') sim.mR.dps = v; },
       wait,
       waitUntil: (fn) => sim.waitUntil(fn),
@@ -365,8 +399,8 @@
         sim.led[(y - 1) * 5 + (x - 1)] = Math.max(0, Math.min(100, num(b)));
       },
       lightOff() { sim.led.fill(0); sim.displayText = ''; },
-      async beep(note, s) {
-        const f = 440 * Math.pow(2, (num(note) - 69) / 12);
+      async beep(note, s) { return this.beepHz(440 * Math.pow(2, (num(note) - 69) / 12), s); },
+      async beepHz(f, s) {
         try {
           audio = audio || new (window.AudioContext || window.webkitAudioContext)();
           const o = audio.createOscillator(), gn = audio.createGain();

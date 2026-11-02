@@ -96,22 +96,48 @@
   setInterval(refreshHub, 100);
 
   /* ---------- 執行 ---------- */
-  const api = SP.createApi(sim, { hl: (id) => ws.highlightBlock(id), say });
+  let lastBlock = null;
+  const api = SP.createApi(sim, { hl: (id) => { lastBlock = id; ws.highlightBlock(id); }, say });
   const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
   let running = false;
   function setRunning(r) { running = r; $('btn-run').hidden = r; $('btn-stop').hidden = !r; }
   async function runProgram() {
     if (running) return;
+    clearErrors(); $('console').textContent = '';
+    ws.getAllBlocks(false).forEach((b) => b.setWarningText(null));
+    if (mode === 'python') return runPython();
+    const found = lint();
+    found.forEach(addError);
+    if (found.some((x) => x.level === 'error')) { showTab('err'); return; }
     let gen;
-    try { gen = SP.generate(ws); } catch (e) { say('積木轉換失敗：' + e.message, true); return; }
-    if (!gen.threads) { say('請先放一個「事件」類別的「當程式開始」積木，再把動作積木接在下面。', true); return; }
-    setRunning(true); $('console').textContent = '';
+    try { gen = SP.generate(ws); } catch (e) { addError({ level: 'error', msg: '積木轉換失敗：' + e.message }); showTab('err'); return; }
+    setRunning(true); lastBlock = null;
     api.resetRun(); sim.yawOff = sim.th; sim.timerOff = sim.simTime; sim.speedPct = 50; sim.lastMoveT = sim.simTime;
     try { await new AsyncFunction('api', gen.code)(api); }
-    catch (e) { if (e !== SP.STOP) say('錯誤：' + (e && e.message ? e.message : e), true); }
+    catch (e) {
+      if (e !== SP.STOP) {
+        const msg = e && e.message ? e.message : String(e);
+        addError({ level: 'error', msg, blockId: lastBlock }); showTab('err');
+        const b = lastBlock && ws.getBlockById(lastBlock); if (b) b.setWarningText(msg);
+      }
+    }
     sim.stopAll(); ws.highlightBlock(null); setRunning(false);
   }
-  function stopProgram() { if (running) sim.abort(); }
+  async function runPython() {
+    const code = $('py-src').value;
+    if (!code.trim()) { addError({ level: 'error', msg: 'Python 程式是空的。可以按「從積木重新產生」，或直接輸入程式。' }); showTab('err'); return; }
+    setRunning(true); markPyLine(null);
+    api.resetRun(); sim.yawOff = sim.th; sim.timerOff = sim.simTime; sim.speedPct = 50; sim.lastMoveT = sim.simTime;
+    try {
+      const r = await SP.py.run(code, api, sim, { say, status: (t) => { $('py-status').textContent = t; } });
+      if (r.error) {
+        addError({ level: 'error', msg: r.error.message, line: r.error.line, raw: r.error.raw }); showTab('err');
+        if (r.error.line) markPyLine(r.error.line);
+      }
+    } catch (e) { addError({ level: 'error', msg: String(e && e.message ? e.message : e) }); showTab('err'); $('py-status').textContent = ''; }
+    sim.stopAll(); setRunning(false);
+  }
+  function stopProgram() { if (running) { SP.py.stop(); sim.abort(); } }
   $('btn-run').onclick = runProgram;
   $('btn-stop').onclick = stopProgram;
 
@@ -129,9 +155,110 @@
   }
   ['set-wheel', 'set-track', 'set-yaw', 'set-real'].forEach((id) => { $(id).onchange = () => applySettings(readSettings()); });
 
+  /* ---------- 報錯台 ---------- */
+  const errs = [];
+  const SENSOR_TYPE = { sp_color_is: 'color', sp_light: 'color', sp_when_color: 'color', sp_dist: 'distance', sp_dist_less: 'distance', sp_when_dist: 'distance', sp_force: 'force', sp_when_force: 'force' };
+  const SENSOR_NAME = { color: '顏色感測器', distance: '距離感測器', force: '力感測器' };
+  const isHat = (b) => b.type === 'sp_start' || b.type.startsWith('sp_when_');
+  function showTab(t) {
+    $('tab-out').classList.toggle('on', t === 'out'); $('tab-err').classList.toggle('on', t === 'err');
+    $('console').hidden = t !== 'out'; $('errors').hidden = t !== 'err';
+  }
+  $('tab-out').onclick = () => showTab('out'); $('tab-err').onclick = () => showTab('err');
+  function clearErrors() { errs.length = 0; renderErrors(); }
+  function addError(e) { e.time = new Date().toLocaleTimeString('zh-TW', { hour12: false }); errs.push(e); renderErrors(); }
+  function goto(e) {
+    if (e.blockId) {
+      const b = ws.getBlockById(e.blockId); if (!b) return;
+      if (mode !== 'blocks') setMode('blocks');
+      ws.centerOnBlock(e.blockId); b.select();
+    } else if (e.line) { if (mode !== 'python') setMode('python'); markPyLine(e.line, true); }
+  }
+  function renderErrors() {
+    const box = $('errors'); box.textContent = '';
+    errs.forEach((e) => {
+      const r = document.createElement('div'); r.className = 'erow ' + e.level + (e.blockId || e.line ? ' link' : '');
+      const lv = document.createElement('span'); lv.className = 'lv'; lv.textContent = e.level === 'error' ? '!' : '?';
+      const tx = document.createElement('span'); tx.textContent = e.msg;
+      const tm = document.createElement('span'); tm.className = 'tm'; tm.textContent = e.time;
+      r.append(lv, tx, tm);
+      if (e.blockId || e.line) {
+        const w = document.createElement('span'); w.className = 'where'; w.textContent = e.line ? '第 ' + e.line + ' 行' : '到積木'; r.append(w);
+        r.onclick = () => goto(e);
+      }
+      if (e.raw) r.title = e.raw;
+      box.appendChild(r);
+    });
+    const n = errs.filter((e) => e.level === 'error').length + errs.filter((e) => e.level === 'warn').length;
+    $('err-badge').hidden = !n; $('err-badge').textContent = n;
+    box.scrollTop = box.scrollHeight;
+  }
+  function lint() {
+    const out = [], tops = ws.getTopBlocks(true), hats = tops.filter(isHat);
+    if (!hats.length) out.push({ level: 'error', msg: '沒有「事件」積木：請放一個「當程式開始」，再把動作積木接在它下面。' });
+    hats.forEach((h) => { if (!h.getNextBlock()) out.push({ level: 'warn', msg: '「' + h.toString().trim() + '」下面沒有接任何積木。', blockId: h.id }); });
+    tops.forEach((b) => { if (!isHat(b) && b.type !== 'procedures_defnoreturn' && !b.isShadow()) out.push({ level: 'warn', msg: '這個積木沒有接在事件積木下面，不會被執行。', blockId: b.id }); });
+    ws.getAllBlocks(false).forEach((b) => {
+      const need = SENSOR_TYPE[b.type], p = need && b.getFieldValue('PORT');
+      if (need && sim.ports[p] !== need) out.push({ level: 'error', msg: '埠 ' + p + ' 沒有連接' + SENSOR_NAME[need] + '（請到「主機與裝置」設定）。', blockId: b.id });
+      b.inputList.forEach((inp) => {
+        const c = inp.connection;
+        if (inp.type === 1 && c && !c.targetBlock() && c.getCheck() && c.getCheck().includes('Boolean')) out.push({ level: 'warn', msg: '缺少條件：這個積木的「條件」是空的。', blockId: b.id });
+      });
+    });
+    return out;
+  }
+
+  /* ---------- 積木／Python 切換 ---------- */
+  let mode = 'blocks', pyDirty = false;
+  const pySrc = $('py-src');
+  function updateGutter() {
+    const n = pySrc.value.split('\n').length, g = $('py-gutter');
+    while (g.childNodes.length < n) g.appendChild(document.createElement('div'));
+    while (g.childNodes.length > n) g.removeChild(g.lastChild);
+    g.childNodes.forEach((d, i) => { d.textContent = i + 1; });
+    g.scrollTop = pySrc.scrollTop;
+  }
+  function markPyLine(line, focus) {
+    updateGutter();
+    $('py-gutter').childNodes.forEach((d, i) => d.classList.toggle('err', line === i + 1));
+    if (line && focus) {
+      const lines = pySrc.value.split('\n'); let pos = 0;
+      for (let i = 0; i < line - 1; i++) pos += lines[i].length + 1;
+      pySrc.focus(); pySrc.setSelectionRange(pos, pos + (lines[line - 1] || '').length);
+      pySrc.scrollTop = Math.max(0, (line - 4) * 22.4); $('py-gutter').scrollTop = pySrc.scrollTop;
+    }
+  }
+  function regenPython() {
+    try {
+      pySrc.value = SP.generatePython(ws, { wheel: +sim.wheelD.toFixed(2), track: +sim.track.toFixed(2) }).code;
+      pyDirty = false; $('py-note').textContent = '已由積木產生'; markPyLine(null);
+    } catch (e) { addError({ level: 'error', msg: '產生 Python 失敗：' + e.message }); showTab('err'); }
+    autosave();
+  }
+  function setMode(m) {
+    mode = m;
+    document.querySelectorAll('#mode-seg button').forEach((b) => b.classList.toggle('on', b.dataset.mode === m));
+    $('pyview').hidden = m !== 'python';
+    if (m === 'python') { if (!pyDirty) regenPython(); updateGutter(); SP.py.ensure((t) => { $('py-status').textContent = t; }).catch(() => { $('py-status').textContent = '尚未載入 Python 執行環境（需要網路）'; }); }
+    else { Blockly.svgResize(ws); if (pyDirty) $('py-note').textContent = ''; }
+    autosave();
+  }
+  document.querySelectorAll('#mode-seg button').forEach((b) => { b.onclick = () => { if (running) return; setMode(b.dataset.mode); }; });
+  $('py-regen').onclick = () => {
+    if (pyDirty && !confirm('重新產生會覆蓋你在 Python 裡改的內容，確定嗎？')) return;
+    regenPython();
+  };
+  $('py-copy').onclick = async () => { try { await navigator.clipboard.writeText(pySrc.value); $('py-note').textContent = '已複製'; } catch (e) { pySrc.select(); $('py-note').textContent = '請按 Ctrl+C 複製'; } };
+  pySrc.addEventListener('input', () => { pyDirty = true; $('py-note').textContent = '已手動修改（不會變回積木）'; updateGutter(); autosave(); });
+  pySrc.addEventListener('scroll', () => { $('py-gutter').scrollTop = pySrc.scrollTop; });
+  pySrc.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') { e.preventDefault(); const s = pySrc.selectionStart; pySrc.setRangeText('    ', s, pySrc.selectionEnd, 'end'); pySrc.dispatchEvent(new Event('input')); }
+  });
+
   /* ---------- 儲存／開啟 ---------- */
   function snapshot() {
-    return { app: 'spike-sim', v: 1, name: $('proj-name').value, ports: sim.ports, scene: $('scene').value, settings: readSettings(), workspace: Blockly.serialization.workspaces.save(ws) };
+    return { app: 'spike-sim', v: 1, name: $('proj-name').value, ports: sim.ports, scene: $('scene').value, settings: readSettings(), mode, py: pySrc.value, pyDirty, workspace: Blockly.serialization.workspaces.save(ws) };
   }
   function restore(d) {
     stopProgram(); ws.clear();
@@ -139,6 +266,8 @@
     $('proj-name').value = d.name || '未命名專案';
     if (d.ports) for (const p of ['C', 'D', 'E', 'F']) if (d.ports[p]) { sim.ports[p] = d.ports[p]; portEl[p + 'sel'].value = d.ports[p]; }
     applySettings(d.settings || {});
+    pySrc.value = d.py || ''; pyDirty = !!d.pyDirty && !!d.py; clearErrors(); showTab('out');
+    setMode(d.mode === 'python' ? 'python' : 'blocks');
     if (d.scene && SP.SCENES.some((s) => s.id === d.scene)) { $('scene').value = d.scene; sim.loadScene(d.scene); }
   }
   let saveT = 0;
