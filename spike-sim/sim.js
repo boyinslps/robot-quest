@@ -97,6 +97,7 @@
       this.waiters = []; this.acc = 0; this.mul = 1; this.pumping = false;
       this.penOn = true; this.showSensors = true; this.display = ''; this.onDisplay = null;
       this.speedPct = 50; this.msgs = {};
+      this.wheelD = WHEEL_D; this.track = TRACK; this.real = false; this.yawSign = 1; this.scaleL = 1; this.scaleR = 1;
       this.ports = { C: 'color', D: 'distance', E: 'force', F: 'none' };
       this.led = new Array(25).fill(0); this.displayText = '';
       this.loadScene('blank');
@@ -119,8 +120,14 @@
       const s = this.scene.start;
       this.rects.forEach((r, i) => { const o = this.scene.rects[i]; r.x = o.x; r.y = o.y; });
       this.x = s.x; this.y = s.y; this.th = rad(s.a);
-      this.mL.dps = this.mR.dps = 0;
+      this.mL.dps = this.mR.dps = 0; this.mL.cur = this.mR.cur = 0;
+      this.rollError();
       this.yawOff = this.th; this.lastMoveT = this.simTime;
+    }
+    rollError() {
+      // 真實模式：兩輪有固定的小誤差（±1%），像真機的輪胎與組裝公差
+      const r = () => (this.real ? 1 + (Math.random() - 0.5) * 0.02 : 1);
+      this.scaleL = r(); this.scaleR = r();
     }
     clearTrail() { this.trail.getContext('2d').clearRect(0, 0, this.trail.width, this.trail.height); }
     rotateBy(deg) { this.th += rad(deg); this.lastMoveT = this.simTime; }
@@ -145,10 +152,12 @@
       return false;
     }
     step() {
-      const dl = this.mL.dps * DT, dr = this.mR.dps * DT;
+      const a = this.real ? 3000 * DT : Infinity;  // 真實模式：馬達加減速 3000 度/秒²
+      for (const m of [this.mL, this.mR]) m.cur = (m.cur || 0) + Math.max(-a, Math.min(a, m.dps - (m.cur || 0)));
+      const dl = this.mL.cur * DT, dr = this.mR.cur * DT;
       this.mL.deg += dl; this.mR.deg += dr;
-      const k = Math.PI * WHEEL_D / 360, sl = dl * k, sr = dr * k;
-      const ds = (sl + sr) / 2, dth = (sl - sr) / TRACK, mid = this.th + dth / 2;
+      const k = Math.PI * this.wheelD / 360, sl = dl * k * this.scaleL, sr = dr * k * this.scaleR;
+      const ds = (sl + sr) / 2, dth = (sl - sr) / this.track, mid = this.th + dth / 2;
       let nx = this.x + ds * Math.sin(mid), ny = this.y - ds * Math.cos(mid), nth = this.th + dth;
       if (this.collides(nx, ny, nth)) {
         nx = this.x; ny = this.y;
@@ -214,7 +223,7 @@
       for (const lx of [-3, 0, 3]) { const [px, py] = this.local(lx, -(HL + 1)); if (this.hit(px, py)) return true; }
       return false;
     }
-    yaw() { let d = Math.round((this.th - this.yawOff) * 180 / Math.PI); d = ((d + 180) % 360 + 360) % 360 - 180; return d; }
+    yaw() { let d = Math.round(this.yawSign * (this.th - this.yawOff) * 180 / Math.PI); d = ((d + 180) % 360 + 360) % 360 - 180; return d; }
     timer() { return Math.round((this.simTime - this.timerOff) * 10) / 10; }
 
     /* --- 拖曳 --- */
@@ -246,7 +255,7 @@
       }
       g.save(); g.translate(this.x, this.y); g.rotate(this.th);
       g.fillStyle = '#2b2b2b';
-      for (const sx of [-1, 1]) g.fillRect(sx * (TRACK / 2) - 0.9, -WHEEL_D / 2, 1.8, WHEEL_D);
+      for (const sx of [-1, 1]) g.fillRect(sx * (this.track / 2) - 0.9, -this.wheelD / 2, 1.8, this.wheelD);
       g.fillStyle = '#f2c400'; g.fillRect(-4.8, -HL, 9.6, 2 * HL);
       g.fillStyle = '#3a3a3a'; g.fillRect(-3.4, -3, 6.8, 7);
       g.fillStyle = '#fff'; for (const sx of [-1, 1]) { g.beginPath(); g.arc(sx * 2.4, -HL + 0.2, 1.3, 0, 7); g.fill(); }
@@ -286,8 +295,8 @@
       async move(dir, n, unit) {
         n = Math.abs(num(n)); const sp = sim.speedPct; if (!sp || !n) return;
         if (unit === 'sec') { sim.drive(dir * sp, dir * sp); await wait(n); sim.stopAll(); return; }
-        const cm = unit === 'rot' ? n * Math.PI * WHEEL_D : n;
-        const kdeg = 360 / (Math.PI * WHEEL_D), start = (sim.mL.deg + sim.mR.deg) / 2;
+        const cm = unit === 'rot' ? n * Math.PI * sim.wheelD : n;
+        const kdeg = 360 / (Math.PI * sim.wheelD), start = (sim.mL.deg + sim.mR.deg) / 2;
         sim.lastMoveT = sim.simTime;
         await sim.waitUntil(() => {
           const rem = cm - dir * ((sim.mL.deg + sim.mR.deg) / 2 - start) / kdeg;

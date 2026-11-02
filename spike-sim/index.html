@@ -11,8 +11,19 @@
 <script src="https://cdn.jsdelivr.net/npm/blockly@11.2.1/msg/zh-hant.js"></script>
 </head>
 <body>
+<div id="home">
+  <div class="home-in">
+    <div class="home-brand"><svg viewBox="0 0 32 32" width="44" height="44" aria-hidden="true"><rect x="3" y="3" width="26" height="26" rx="7" fill="#ffd400"/><g fill="#222"><circle cx="11" cy="11" r="2.3"/><circle cx="21" cy="11" r="2.3"/><circle cx="11" cy="21" r="2.3"/><circle cx="21" cy="21" r="2.3"/></g></svg><h1>SPIKE 模擬器</h1></div>
+    <p class="home-sub">用積木寫程式，在模擬場地裡看機器人怎麼動。</p>
+    <h2>開始</h2>
+    <div class="tiles" id="tiles-start"></div>
+    <h2>範例專案</h2>
+    <div class="tiles" id="tiles-sample"></div>
+  </div>
+</div>
 <div id="app">
   <header class="topbar">
+    <button class="home-btn" id="btn-home" type="button" title="回到首頁" aria-label="回到首頁"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" fill="#3d4357"/></svg></button>
     <div class="brand" title="SPIKE 模擬器">
       <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><rect x="3" y="3" width="26" height="26" rx="7" fill="#ffd400"/><g fill="#222"><circle cx="11" cy="11" r="2.3"/><circle cx="21" cy="11" r="2.3"/><circle cx="11" cy="21" r="2.3"/><circle cx="21" cy="21" r="2.3"/></g></svg>
       <span>SPIKE 模擬器</span>
@@ -65,6 +76,16 @@
             <div class="yaw" id="val-yaw">轉向角度 0°</div>
           </div>
           <div class="ports" id="ports-right"></div>
+        </div>
+      </div>
+
+      <div class="card set-card">
+        <div class="card-h"><span class="card-t">機器人設定</span><span class="muted">依你的車型校正</span></div>
+        <div class="setgrid">
+          <label>輪徑（毫米）<input type="number" id="set-wheel" value="56" min="20" max="120" step="1"></label>
+          <label>輪距（毫米，兩輪中心）<input type="number" id="set-track" value="112" min="60" max="250" step="1"></label>
+          <label>轉向角度方向<select id="set-yaw"><option value="1">順時針為正</option><option value="-1">逆時針為正</option></select></label>
+          <label class="chk wide"><input type="checkbox" id="set-real"> 真實模式（馬達加減速、兩輪 ±1% 誤差）</label>
         </div>
       </div>
 

@@ -93,3 +93,24 @@ dialog li { margin: 6px 0; line-height: 1.55; }
 
 .hubchip { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: #2c8a4f; background: #e8f7ee; border-radius: 999px; padding: 6px 12px; margin-right: 6px; }
 .hubchip i { width: 9px; height: 9px; border-radius: 50%; background: #2fb85f; }
+
+.home-btn { border: 0; background: #f3f5f9; border-radius: 8px; width: 36px; height: 36px; display: grid; place-items: center; cursor: pointer; }
+.home-btn:hover { background: #e4e8f0; }
+.setgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+.setgrid label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 3px; font-weight: 700; }
+.setgrid label.chk { flex-direction: row; align-items: center; color: var(--ink); }
+.setgrid .wide { grid-column: 1 / -1; }
+.setgrid input[type=number] { font: 700 13px var(--font); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; width: 100%; color: var(--ink); }
+
+#home { position: fixed; inset: 0; z-index: 100; background: linear-gradient(180deg, #fff8d6 0, #eef1f6 40%); overflow-y: auto; }
+.home-in { max-width: 980px; margin: 0 auto; padding: 40px 24px; }
+.home-brand { display: flex; align-items: center; gap: 12px; }
+.home-brand h1 { margin: 0; font-size: 32px; }
+.home-sub { color: var(--muted); margin: 6px 0 24px; }
+.home-in h2 { font-size: 16px; margin: 22px 0 10px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+.tile { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 16px; cursor: pointer; text-align: left; font-family: var(--font); color: var(--ink); display: flex; flex-direction: column; gap: 6px; min-height: 110px; box-shadow: 0 2px 6px rgba(0,0,0,.05); }
+.tile:hover { border-color: var(--blue); box-shadow: 0 4px 14px rgba(76,151,255,.25); }
+.tile b { font-size: 16px; }
+.tile span { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.tile .dot { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 20px; }

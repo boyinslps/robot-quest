@@ -115,15 +115,30 @@
   $('btn-run').onclick = runProgram;
   $('btn-stop').onclick = stopProgram;
 
+  /* ---------- 機器人設定 ---------- */
+  function readSettings() {
+    return { wheel: Number($('set-wheel').value), track: Number($('set-track').value), yaw: Number($('set-yaw').value), real: $('set-real').checked };
+  }
+  function applySettings(st) {
+    if (st.wheel) $('set-wheel').value = st.wheel; if (st.track) $('set-track').value = st.track;
+    if (st.yaw) $('set-yaw').value = st.yaw; $('set-real').checked = !!st.real;
+    const r = readSettings();
+    sim.wheelD = Math.max(2, Math.min(12, r.wheel / 10 || 5.6)); sim.track = Math.max(6, Math.min(25, r.track / 10 || 11.2));
+    sim.yawSign = r.yaw === -1 ? -1 : 1; sim.real = r.real; sim.rollError();
+    autosave();
+  }
+  ['set-wheel', 'set-track', 'set-yaw', 'set-real'].forEach((id) => { $(id).onchange = () => applySettings(readSettings()); });
+
   /* ---------- 儲存／開啟 ---------- */
   function snapshot() {
-    return { app: 'spike-sim', v: 1, name: $('proj-name').value, ports: sim.ports, scene: $('scene').value, workspace: Blockly.serialization.workspaces.save(ws) };
+    return { app: 'spike-sim', v: 1, name: $('proj-name').value, ports: sim.ports, scene: $('scene').value, settings: readSettings(), workspace: Blockly.serialization.workspaces.save(ws) };
   }
   function restore(d) {
     stopProgram(); ws.clear();
     if (d.workspace) Blockly.serialization.workspaces.load(d.workspace, ws);
     $('proj-name').value = d.name || '未命名專案';
     if (d.ports) for (const p of ['C', 'D', 'E', 'F']) if (d.ports[p]) { sim.ports[p] = d.ports[p]; portEl[p + 'sel'].value = d.ports[p]; }
+    applySettings(d.settings || {});
     if (d.scene && SP.SCENES.some((s) => s.id === d.scene)) { $('scene').value = d.scene; sim.loadScene(d.scene); }
   }
   let saveT = 0;
@@ -150,9 +165,38 @@
       type: 'sp_move', fields: { DIR: '1', UNIT: 'cm' }, inputs: { N: nb(40) }, next: { block: {
         type: 'sp_turn', fields: { DIR: '1' }, inputs: { DEG: nb(90) } } } } } } } } }] } };
 
+  /* ---------- 首頁與範例 ---------- */
+  const eq = (type, fields, inputs, next) => ({ type, ...(fields ? { fields } : {}), ...(inputs ? { inputs } : {}), ...(next ? { next: { block: next } } : {}) });
+  const ife = (inputs) => ({ ...eq('controls_if', null, inputs), extraState: { hasElse: true } });
+  const SAMPLES = [
+    { name: '走正方形', desc: '重複 4 次：前進 40 公分、右轉 90 度。', scene: 'blank', color: '#4c97ff', ws: DEFAULT },
+    { name: '遇牆就轉彎', desc: '一直重複：距離小於 20 公分就右轉，不然前進。', scene: 'boxes', color: '#5cb1d6', ws: { blocks: { languageVersion: 0, blocks: [eq('sp_start', null, null, eq('sp_forever', null, { DO: { block: ife({
+      IF0: { block: eq('sp_dist_less', { PORT: 'D', OP: '<' }, { N: nb(20) }) }, DO0: { block: eq('sp_turn', { DIR: '1' }, { DEG: nb(90) }) }, ELSE: { block: eq('sp_move', { DIR: '1', UNIT: 'cm' }, { N: nb(5) }) } }) } })) ] } } },
+    { name: '黑線循線', desc: '顏色感測器看到黑色就向右修正，否則向左，沿著跑道繞圈。', scene: 'line', color: '#59c059', ws: { blocks: { languageVersion: 0, blocks: [eq('sp_start', null, null, eq('sp_set_speed', null, { P: nb(30) }, eq('sp_forever', null, { DO: { block: ife({
+      IF0: { block: eq('sp_color_is', { PORT: 'C', COLOR: 'black' }) }, DO0: { block: eq('sp_steer', null, { STEER: nb(35) }) }, ELSE: { block: eq('sp_steer', null, { STEER: nb(-35) }) } }) } }))) ] } } },
+    { name: '看到紅色就停', desc: '開始前進，等到顏色感測器看到紅色就停止並發出嗶聲。', scene: 'colors', color: '#ff8c1a', ws: { blocks: { languageVersion: 0, blocks: [eq('sp_start', null, null, eq('sp_start_move', { DIR: '1' }, null,
+      eq('sp_wait_until', null, { C: { block: eq('sp_color_is', { PORT: 'C', COLOR: 'red' }) } }, eq('sp_stop', null, null, eq('sp_beep', null, { NOTE: nb(72), S: nb(0.5) }))))) ] } } },
+  ];
+  function tile(parent, title, desc, color, glyph, fn) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'tile';
+    b.innerHTML = '<div class="dot"></div><b></b><span></span>';
+    b.querySelector('.dot').style.background = color; b.querySelector('.dot').textContent = glyph;
+    b.querySelector('b').textContent = title; b.querySelector('span').textContent = desc;
+    b.onclick = () => { fn(); $('home').hidden = true; Blockly.svgResize(ws); }; parent.appendChild(b);
+  }
+  function buildHome(saved) {
+    $('tiles-start').textContent = ''; $('tiles-sample').textContent = '';
+    tile($('tiles-start'), '新專案', '從空白開始，只有「當程式開始」。', '#4c97ff', '+', () => restore({ workspace: { blocks: { languageVersion: 0, blocks: [{ type: 'sp_start', x: 40, y: 40 }] } }, name: '未命名專案' }));
+    if (saved && saved.workspace) tile($('tiles-start'), '繼續：' + (saved.name || '未命名專案'), '回到上次編輯的內容。', '#2fb85f', '>', () => restore(saved));
+    tile($('tiles-start'), '開啟檔案', '開啟之前儲存的 .json。', '#9966ff', '↑', () => $('file-open').click());
+    SAMPLES.forEach((s) => tile($('tiles-sample'), s.name, s.desc, s.color, '▶', () => restore({ name: s.name, workspace: s.ws, scene: s.scene })));
+  }
+  $('btn-home').onclick = () => { stopProgram(); let sv = null; try { sv = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { /* 略 */ } buildHome(sv); $('home').hidden = false; };
+
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { saved = null; }
   try { restore(saved && saved.workspace ? saved : { workspace: DEFAULT }); } catch (e) { restore({ workspace: DEFAULT }); }
+  buildHome(saved);
   window.addEventListener('resize', () => Blockly.svgResize(ws));
   SP.ws = ws; SP.sim = sim; SP.run = runProgram;
 })(window.SP = window.SP || {});
