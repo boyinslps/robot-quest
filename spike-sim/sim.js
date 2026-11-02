@@ -96,7 +96,7 @@
       this.simTime = 0; this.timerOff = 0; this.yawOff = 0; this.lastMoveT = 0;
       this.waiters = []; this.acc = 0; this.mul = 1; this.pumping = false;
       this.penOn = true; this.showSensors = true; this.display = ''; this.onDisplay = null;
-      this.speedPct = 50;
+      this.speedPct = 50; this.msgs = {};
       this.ports = { C: 'color', D: 'distance', E: 'force', F: 'none' };
       this.led = new Array(25).fill(0); this.displayText = '';
       this.loadScene('blank');
@@ -272,7 +272,7 @@
     const num = (v) => { v = Number(v); return isFinite(v) ? v : 0; };
     const clamp = (v) => Math.max(-100, Math.min(100, num(v)));
     const wait = (s) => { const t = sim.simTime + Math.max(0, num(s)); return sim.waitUntil(() => sim.simTime >= t); };
-    let audio = null;
+    let audio = null, seen = {};
     const need = (p, type) => {
       if (sim.ports[p] !== type) {
         const nm = { color: '顏色感測器', distance: '距離感測器', force: '力感測器' }[type];
@@ -292,7 +292,7 @@
         await sim.waitUntil(() => {
           const rem = cm - dir * ((sim.mL.deg + sim.mR.deg) / 2 - start) / kdeg;
           if (rem <= 0.02 || sim.stalled()) return true;
-          const s = Math.min(sp, Math.max(10, rem * 12)); sim.drive(dir * s, dir * s); return false;
+          const s = Math.min(sp, Math.max(4, rem * 12)); sim.drive(dir * s, dir * s); return false;
         });
         sim.stopAll();
       },
@@ -301,8 +301,8 @@
         const th0 = sim.th; sim.lastMoveT = sim.simTime;
         await sim.waitUntil(() => {
           const rem = deg - dir * (sim.th - th0) * 180 / Math.PI;
-          if (rem <= 0.2 || sim.stalled()) return true;
-          const s = Math.max(8, Math.min(sp, rem * 1.5)); sim.drive(dir * s, -dir * s); return false;
+          if (rem <= 0.1 || sim.stalled()) return true;
+          const s = Math.max(3, Math.min(sp, rem * 1.5)); sim.drive(dir * s, -dir * s); return false;
         });
         sim.stopAll();
       },
@@ -337,6 +337,14 @@
       motorPos: (p) => Math.round(p === 'A' ? sim.mL.deg : sim.mR.deg),
       motorStop(p) { if (p === 'A' || p === 'AB') sim.mL.dps = 0; if (p === 'B' || p === 'AB') sim.mR.dps = 0; },
       say: (t) => io.say(t),
+      broadcast(m) { sim.msgs[m] = (sim.msgs[m] || 0) + 1; },
+      resetRun() { sim.msgs = {}; seen = {}; },
+      async waitMsg(m, who) {
+        const k = who + '|' + m;
+        await sim.waitUntil(() => (sim.msgs[m] || 0) > (seen[k] || 0));
+        seen[k] = (seen[k] || 0) + 1;
+      },
+      stopProgram() { sim.abort(); throw STOP; },
       lightText(t) { sim.displayText = String(t); sim.led.fill(0); io.say('[螢幕] ' + t); },
       lightPattern(name) {
         const rows = PATTERNS[name] || PATTERNS.heart;

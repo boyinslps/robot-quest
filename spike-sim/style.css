@@ -90,3 +90,6 @@ dialog li { margin: 6px 0; line-height: 1.55; }
   .side { width: 100%; border-left: 0; overflow: visible; }
   .proj { width: 140px; }
 }
+
+.hubchip { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: #2c8a4f; background: #e8f7ee; border-radius: 999px; padding: 6px 12px; margin-right: 6px; }
+.hubchip i { width: 9px; height: 9px; border-radius: 50%; background: #2fb85f; }

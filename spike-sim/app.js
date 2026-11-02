@@ -15,6 +15,10 @@
     trashcan: false,
   });
 
+  ws.registerToolboxCategoryCallback('PROCEDURE', (w) => Blockly.Procedures.flyoutCategory(w).filter((el) => {
+    const t = el.getAttribute && el.getAttribute('type');
+    return !['procedures_defreturn', 'procedures_ifreturn', 'procedures_callreturn'].includes(t);
+  }));
   const sim = new SP.Sim($('stage'));
 
   /* ---------- 訊息欄 ---------- */
@@ -102,7 +106,7 @@
     try { gen = SP.generate(ws); } catch (e) { say('積木轉換失敗：' + e.message, true); return; }
     if (!gen.threads) { say('請先放一個「事件」類別的「當程式開始」積木，再把動作積木接在下面。', true); return; }
     setRunning(true); $('console').textContent = '';
-    sim.yawOff = sim.th; sim.timerOff = sim.simTime; sim.speedPct = 50; sim.lastMoveT = sim.simTime;
+    api.resetRun(); sim.yawOff = sim.th; sim.timerOff = sim.simTime; sim.speedPct = 50; sim.lastMoveT = sim.simTime;
     try { await new AsyncFunction('api', gen.code)(api); }
     catch (e) { if (e !== SP.STOP) say('錯誤：' + (e && e.message ? e.message : e), true); }
     sim.stopAll(); ws.highlightBlock(null); setRunning(false);

@@ -13,6 +13,7 @@
     sensor: ['#5CB1D6', '#47A8D1', '#2E8EB8'],
     operator: ['#59C059', '#46B946', '#389438'],
     variable: ['#FF8C1A', '#FF8000', '#DB6E00'],
+    procedure: ['#FF6680', '#FF4D6A', '#FF3355'],
   };
   const style = (c) => ({ colourPrimary: c[0], colourSecondary: c[1], colourTertiary: c[2] });
   SP.theme = Blockly.Theme.defineTheme('spike', {
@@ -20,7 +21,7 @@
     blockStyles: {
       motion_blocks: style(COL.motion), light_blocks: style(COL.light), sound_blocks: style(COL.sound),
       event_blocks: style(COL.event), control_blocks: style(COL.control), sensor_blocks: style(COL.sensor),
-      operator_blocks: style(COL.operator), variable_blocks: style(COL.variable),
+      operator_blocks: style(COL.operator), variable_blocks: style(COL.variable), procedure_blocks: style(COL.procedure),
       loop_blocks: style(COL.control), logic_blocks: style(COL.operator), math_blocks: style(COL.operator),
       text_blocks: style(COL.operator), variable_dynamic_blocks: style(COL.variable),
     },
@@ -28,7 +29,7 @@
       motion_category: { colour: COL.motion[0] }, light_category: { colour: COL.light[0] },
       sound_category: { colour: COL.sound[0] }, event_category: { colour: COL.event[0] },
       control_category: { colour: COL.control[0] }, sensor_category: { colour: COL.sensor[0] },
-      operator_category: { colour: COL.operator[0] }, variable_category: { colour: COL.variable[0] },
+      operator_category: { colour: COL.operator[0] }, variable_category: { colour: COL.variable[0] }, procedure_category: { colour: COL.procedure[0] },
     },
     componentStyles: {
       workspaceBackgroundColour: '#f9f9f9', toolboxBackgroundColour: '#ffffff', flyoutBackgroundColour: '#f1f3f7',
@@ -52,6 +53,10 @@
     { type: 'sp_when_color', message0: '當 %1 看到 %2', args0: [dd('PORT', PORTS('C')), dd('COLOR', COLORS)], nextStatement: null, style: 'event_blocks' },
     { type: 'sp_when_force', message0: '當 %1 被 %2', args0: [dd('PORT', PORTS('E')), dd('STATE', [['按下', 'down'], ['放開', 'up']])], nextStatement: null, style: 'event_blocks' },
     { type: 'sp_when_dist', message0: '當 %1 距離 %2 %3 公分', args0: [dd('PORT', PORTS('D')), dd('OP', [['小於', '<'], ['大於', '>']]), num('N')], nextStatement: null, style: 'event_blocks' },
+    { type: 'sp_when_message', message0: '當收到訊息 %1', args0: [{ type: 'field_input', name: 'MSG', text: '訊息1' }], nextStatement: null, style: 'event_blocks' },
+    { type: 'sp_when_timer', message0: '當計時器大於 %1 秒', args0: [num('N')], nextStatement: null, style: 'event_blocks' },
+    { type: 'sp_broadcast', message0: '傳送訊息 %1', args0: [{ type: 'field_input', name: 'MSG', text: '訊息1' }], ...stmt, style: 'event_blocks' },
+    { type: 'sp_stop_program', message0: '停止程式', previousStatement: null, style: 'control_blocks' },
     // 動作
     { type: 'sp_move', message0: '移動 %1 %2 %3', args0: [dd('DIR', [['前進', '1'], ['後退', '-1']]), num('N'), dd('UNIT', [['公分', 'cm'], ['圈', 'rot'], ['秒', 'sec']])], ...stmt, style: 'motion_blocks' },
     { type: 'sp_turn', message0: '向 %1 轉 %2 度', args0: [dd('DIR', [['右', '1'], ['左', '-1']]), num('DEG')], ...stmt, style: 'motion_blocks' },
@@ -100,6 +105,18 @@
   const q = (s) => JSON.stringify(String(s));
   const S = G.forBlock;
 
+  S.sp_when_message = () => '';
+  S.sp_when_timer = () => '';
+  S.sp_broadcast = (b) => `api.broadcast(${q(f(b, 'MSG'))});\n`;
+  S.sp_stop_program = () => 'api.stopProgram();\n';
+  // 「我的積木」：改成 async，呼叫時 await
+  const origDef = S.procedures_defnoreturn, origCall = S.procedures_callnoreturn;
+  S.procedures_defnoreturn = function (b, g) {
+    const r = origDef.call(this, b, g), k = '%' + g.getProcedureName(b.getFieldValue('NAME'));
+    if (g.definitions_[k]) g.definitions_[k] = g.definitions_[k].replace(/^function /m, 'async function ');
+    return r;
+  };
+  S.procedures_callnoreturn = function (b, g) { return 'await ' + origCall.call(this, b, g); };
   for (const t of ['sp_start', 'sp_when_color', 'sp_when_force', 'sp_when_dist']) S[t] = () => '';
   S.sp_move = (b) => `await api.move(${f(b, 'DIR')}, ${v(b, 'N')}, ${q(f(b, 'UNIT'))});\n`;
   S.sp_turn = (b) => `await api.turn(${f(b, 'DIR')}, ${v(b, 'DEG')});\n`;
@@ -136,12 +153,17 @@
     G.init(ws);
     const hats = ws.getTopBlocks(true).filter((b) => b.type.startsWith('sp_start') || b.type.startsWith('sp_when_'));
     let code = '', names = [];
+    ws.getTopBlocks(true).filter((b) => b.type === 'procedures_defnoreturn').forEach((b) => G.blockToCode(b));
     hats.forEach((h, i) => {
       const first = h.getNextBlock();
       let body = first ? G.blockToCode(first) : '';
       if (Array.isArray(body)) body = body[0];
       const P = q(h.getFieldValue('PORT')), C = q(h.getFieldValue('COLOR'));
-      if (h.type === 'sp_when_color' || h.type === 'sp_when_force' || h.type === 'sp_when_dist') {
+      if (h.type === 'sp_when_message') body = `while (true) {\nawait api.waitMsg(${q(h.getFieldValue('MSG'))}, 'h${i}');\n${body}}\n`;
+      else if (h.type === 'sp_when_timer') {
+        const c = `api.timer() > ${v(h, 'N')}`;
+        body = `while (true) {\nawait api.waitUntil(() => ${c});\n${body}await api.waitUntil(() => !(${c}));\n}\n`;
+      } else if (h.type === 'sp_when_color' || h.type === 'sp_when_force' || h.type === 'sp_when_dist') {
         const cond = h.type === 'sp_when_color' ? `api.colorIs(${P}, ${C})`
           : h.type === 'sp_when_force' ? `(api.pressed(${P}) === ${h.getFieldValue('STATE') === 'down'})`
             : `api.distLess(${P}, ${q(h.getFieldValue('OP'))}, ${v(h, 'N')})`;
@@ -175,11 +197,12 @@
       cat('聲音', 'sound', 'sound_category', [blk('sp_beep', { NOTE: n(60), S: n(0.5) })]),
       cat('事件', 'event', 'event_category', [
         blk('sp_start'), blk('sp_when_color'), blk('sp_when_force'), blk('sp_when_dist', { N: n(20) }),
+        blk('sp_when_timer', { N: n(5) }), blk('sp_when_message'), blk('sp_broadcast'),
       ]),
       cat('控制', 'control', 'control_category', [
         blk('sp_wait', { S: n(1) }), blk('controls_repeat_ext', { TIMES: n(10) }), blk('sp_forever'),
         blk('controls_if'), { kind: 'block', type: 'controls_if', extraState: { hasElse: true } },
-        blk('sp_wait_until'), blk('sp_repeat_until'), blk('controls_flow_statements'),
+        blk('sp_wait_until'), blk('sp_repeat_until'), blk('controls_flow_statements'), blk('sp_stop_program'),
       ]),
       cat('感測', 'sensor', 'sensor_category', [
         blk('sp_color_is'), blk('sp_light'), blk('sp_dist'), blk('sp_dist_less', { N: n(20) }), blk('sp_force'),
@@ -195,10 +218,13 @@
         blk('math_modulo', { DIVIDEND: n(10), DIVISOR: n(3) }), blk('math_round', { NUM: n(3.6) }),
       ]),
       cat('變數', 'variable', 'variable_category', []),
+      cat('我的積木', 'procedure', 'procedure_category', []),
     ],
   };
   SP.toolbox.contents[7].custom = 'VARIABLE';
   delete SP.toolbox.contents[7].contents;
+  SP.toolbox.contents[8].custom = 'PROCEDURE';
+  delete SP.toolbox.contents[8].contents;
 
   /* ---------- 類別圓形圖示（自畫 SVG） ---------- */
   const svg = (inner) => 'url("data:image/svg+xml,' + encodeURIComponent(
@@ -211,6 +237,7 @@
     control: '<path d="M19 12a7 7 0 1 1-2.5-5.4"/><path d="M19 4v5h-5" />',
     sensor: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3" fill="#fff"/>',
     operator: '<path d="M7 4v8M3 8h8"/><path d="M13 17h8"/><path d="M14 4l6 8M20 4l-6 8" />',
+    procedure: '<rect x="4" y="5" width="16" height="6" rx="2" fill="#fff"/><rect x="8" y="13" width="12" height="6" rx="2" fill="#fff"/>',
     variable: '<rect x="4" y="4" width="16" height="4" rx="2" fill="#fff"/><rect x="4" y="10" width="16" height="4" rx="2" fill="#fff"/><rect x="4" y="16" width="16" height="4" rx="2" fill="#fff"/>',
   };
   SP.iconCss = () => Object.keys(GLYPH).map((k) =>
