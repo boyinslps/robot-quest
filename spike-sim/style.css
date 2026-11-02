@@ -1,0 +1,92 @@
+:root {
+  --ink: #3d4357; --muted: #7b8196; --line: #e1e4ea; --bg: #eef1f6; --card: #fff;
+  --blue: #4c97ff; --green: #2fb85f; --red: #e6483d; --yellow: #ffd400;
+  --font: "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font-family: var(--font); overflow: hidden; }
+#app { display: flex; flex-direction: column; height: 100%; }
+
+/* 上方列 */
+.topbar { display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 14px; background: #fff; border-bottom: 1px solid var(--line); flex: none; }
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 17px; letter-spacing: .5px; }
+.proj { border: 1px solid transparent; border-radius: 8px; padding: 7px 10px; font: 600 15px var(--font); color: var(--ink); background: #f3f5f9; width: 220px; margin-left: 12px; }
+.proj:focus { outline: 2px solid var(--blue); background: #fff; }
+.grow { flex: 1; }
+.tbtn { border: 0; border-radius: 8px; padding: 8px 16px; background: var(--blue); color: #fff; font: 700 14px var(--font); cursor: pointer; }
+.tbtn:hover { filter: brightness(1.08); }
+.tbtn.ghost { background: #eef1f6; color: var(--ink); }
+
+/* 主區 */
+.body { flex: 1; display: flex; min-height: 0; }
+.coding { position: relative; flex: 1; min-width: 0; }
+#blockly { position: absolute; inset: 0; }
+.runbar { position: absolute; right: 22px; bottom: 22px; z-index: 40; }
+.round { width: 64px; height: 64px; border-radius: 50%; border: 0; cursor: pointer; display: grid; place-items: center; box-shadow: 0 3px 10px rgba(0,0,0,.25); }
+.round.run { background: var(--green); }
+.round.stop { background: var(--red); }
+.round:hover { filter: brightness(1.07); }
+.round:active { transform: scale(.96); }
+
+.side { width: 500px; flex: none; padding: 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; border-left: 1px solid var(--line); background: var(--bg); }
+.card { background: var(--card); border-radius: 12px; border: 1px solid var(--line); padding: 10px 12px; }
+.card-h { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+.card-t { font-weight: 800; font-size: 15px; margin-right: auto; }
+.muted { color: var(--muted); font-size: 12px; }
+.sel { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 4px; }
+select { font: 600 13px var(--font); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 5px 6px; background: #fff; }
+.stagewrap { position: relative; border-radius: 8px; overflow: hidden; border: 1px solid var(--line); }
+#stage { display: block; width: 100%; height: auto; touch-action: none; cursor: grab; background: #fafaf5; }
+#stage.drag { cursor: grabbing; }
+.hintline { position: absolute; left: 8px; bottom: 6px; font-size: 11px; color: #555; background: rgba(255,255,255,.75); padding: 1px 6px; border-radius: 6px; pointer-events: none; }
+.stage-bar { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; margin-top: 8px; }
+.pill { border: 1px solid var(--line); background: #f3f5f9; color: var(--ink); border-radius: 999px; padding: 6px 12px; font: 700 12px var(--font); cursor: pointer; }
+.pill:hover { background: #e7ebf3; }
+.pill.small { padding: 3px 10px; }
+.chk { font-size: 12px; color: var(--ink); display: flex; align-items: center; gap: 4px; }
+
+/* 主機 */
+.hubgrid { display: grid; grid-template-columns: 1fr 150px 1fr; gap: 10px; align-items: stretch; }
+.ports { display: flex; flex-direction: column; gap: 8px; }
+.port { display: flex; align-items: center; gap: 6px; background: #f3f5f9; border-radius: 10px; padding: 6px; min-height: 52px; }
+.pbadge { flex: none; width: 26px; height: 26px; border-radius: 7px; background: #3d4357; color: #fff; font-weight: 800; display: grid; place-items: center; font-size: 14px; }
+.pinfo { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.pinfo select { width: 100%; padding: 3px 4px; font-size: 12px; }
+.pname { font-size: 12px; font-weight: 700; }
+.pval { font-size: 12px; color: var(--blue); font-weight: 800; font-variant-numeric: tabular-nums; }
+.hub { background: #e9ecf2; border: 2px solid #c9cfdb; border-radius: 16px; padding: 12px 10px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.matrix { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; background: #222; padding: 6px; border-radius: 8px; width: 118px; }
+.matrix i { display: block; aspect-ratio: 1; border-radius: 3px; background: #3b3f49; }
+.hub-btn { width: 30px; height: 30px; border-radius: 50%; background: #fff; border: 4px solid #c9cfdb; }
+.hub-text { font-size: 12px; font-weight: 700; min-height: 16px; text-align: center; word-break: break-all; }
+.yaw { font-size: 12px; color: var(--muted); font-weight: 700; margin-top: auto; text-align: center; }
+
+#console { height: 110px; overflow-y: auto; background: #1f2330; color: #d9e0f0; border-radius: 8px; padding: 6px 10px; font: 13px/1.5 ui-monospace, Menlo, Consolas, monospace; }
+#console .err { color: #ff8a80; }
+#console:empty::before { content: '（程式印出的內容會顯示在這裡）'; color: #6b728a; }
+
+dialog { border: 0; border-radius: 14px; padding: 20px 24px; max-width: 560px; font-family: var(--font); color: var(--ink); box-shadow: 0 10px 40px rgba(0,0,0,.3); }
+dialog::backdrop { background: rgba(30,35,50,.45); }
+dialog h2 { margin: 0 0 8px; }
+dialog li { margin: 6px 0; line-height: 1.55; }
+
+/* 積木類別列：仿 SPIKE App 的圓形圖示 + 文字 */
+.blocklyToolboxDiv { width: 76px; padding: 6px 0; background: #fff !important; border-right: 1px solid var(--line); overflow-y: auto; }
+.blocklyToolboxCategoryGroup { display: block; }
+.blocklyToolboxCategory { display: block; margin: 0 !important; padding: 0 !important; }
+.blocklyTreeRow, .blocklyToolboxCategory .blocklyTreeRow { display: flex !important; flex-direction: column; align-items: center; height: auto !important; line-height: normal !important; margin: 2px 6px !important; padding: 6px 0 4px !important; border-radius: 10px; background: transparent !important; border: 0 !important; }
+.blocklyTreeIcon, .cat-icon { display: block !important; width: 40px !important; height: 40px !important; border-radius: 50%; margin: 0 0 3px !important; flex: none; box-shadow: inset 0 -3px 0 rgba(0,0,0,.12); }
+.blocklyTreeLabel { font: 700 12px var(--font) !important; color: #575e75 !important; text-align: center; }
+.blocklyToolboxSelected > .blocklyTreeRow, .blocklyTreeSelected { background: #e4ecff !important; }
+.blocklyToolboxCategory:hover > .blocklyTreeRow { background: #f1f4fb !important; }
+.blocklyFlyoutBackground { fill: #f1f3f7; }
+
+@media (max-width: 1000px) {
+  html, body { overflow: auto; height: auto; }
+  #app { height: auto; }
+  .body { flex-direction: column; }
+  .coding { height: 70vh; flex: none; }
+  .side { width: 100%; border-left: 0; overflow: visible; }
+  .proj { width: 140px; }
+}
