@@ -4,6 +4,8 @@
 
 目前是 **mockup**：前端可以完整玩一輪（考試說明 → 登入 → Lego Quest 拼積木 → Robot Quest 積木程式）；成績會上傳 Firebase。教師後台涵蓋選拔的三關（組裝、程式、面試）：程式自動評分，組裝與面試由老師輸入分數，並算出綜合成績（設定見 [FIREBASE_SETUP.md](FIREBASE_SETUP.md)）。
 
+> 這個倉庫另外有一個**獨立的工具**：給學生練習 LEGO SPIKE 的 [SPIKE 模擬器](spike-sim/)（積木與 Python、模擬場地）。它和篩選測驗、教師後台沒有任何關聯，說明在 [spike-sim/README.md](spike-sim/README.md)。
+
 ## 怎麼開
 
 **最簡單**：直接用 Chrome 開 `mockup/index.html`（點兩下即可）。需要網路，因為 Blockly 暫時從 CDN 載入。
@@ -69,12 +71,26 @@ teacher/
   index.html          教師後台（Google 登入）：三關總覽、單一關卡的全部學生與詳細表現、評分標準與設定
   dashboard.js        畫面；store.js 資料層（Firebase／本機）；teacher.css
   labels.html         Lego Quest 袋子標籤列印頁
+spike-sim/          SPIKE 模擬器（獨立工具，與上面的篩選測驗無關；說明見 spike-sim/README.md）
 firestore.rules      Firestore 安全規則（學生只能寫自己的、老師才能讀）
 FIREBASE_SETUP.md    Firebase 一次性設定步驟
 DECISIONS.md        設計決定與和原準則不同的地方（公開，不含答案）
 private/            老師專用、不公開（.gitignore）：參考解、關卡／評分／Lego Quest 的自動驗證、含答案的設計筆記
 lego quest/         Lego Quest 的規格書、原始 PDF 與壓縮檔（原始素材，不進 git）
 ```
+
+## SPIKE 模擬器（獨立工具）
+
+給學生練習 LEGO SPIKE：用積木或 Python 寫程式，在模擬場地裡看機器人怎麼動；積木與 Python 的名稱、預設值依 LEGO 官方說明，Python 在瀏覽器內執行，並有中文報錯台。
+
+| 網址 | 用途 |
+|---|---|
+| `https://boyinslps.github.io/robot-quest/` | 篩選測驗（學生端） |
+| `https://boyinslps.github.io/robot-quest/spike-sim/` | SPIKE 模擬器（給學生練習用） |
+
+- 程式在 `spike-sim/`，不使用 Firebase、不讀寫任何考生資料，改它不會影響篩選測驗。
+- 也可以直接用 Chrome 開 `spike-sim/index.html`（需要網路，Blockly 與 Python 執行環境從 CDN 載入）。
+- 功能、和官方積木的對照、尚未做與未經真機驗證的部分，都寫在 [spike-sim/README.md](spike-sim/README.md)。
 
 ## Lego Quest（實體積木組裝）
 
