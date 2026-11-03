@@ -129,7 +129,7 @@
     setRunning(true); markPyLine(null);
     api.resetRun(); sim.yawOff = sim.th; sim.timerOff = sim.simTime; sim.speedPct = 50; sim.lastMoveT = sim.simTime;
     try {
-      const r = await SP.py.run(code, api, sim, { say, status: (t) => { $('py-status').textContent = t; } });
+      const r = await SP.py.run(code, api, sim, { say, warn: (m, line) => { addError({ level: 'warn', msg: m, line }); }, status: (t) => { $('py-status').textContent = t; } });
       if (r.error) {
         addError({ level: 'error', msg: r.error.message, line: r.error.line, raw: r.error.raw }); showTab('err');
         if (r.error.line) markPyLine(r.error.line);
@@ -150,7 +150,7 @@
     if (st.yaw) $('set-yaw').value = st.yaw; $('set-real').checked = !!st.real;
     const r = readSettings();
     sim.wheelD = Math.max(2, Math.min(12, r.wheel / 10 || 5.6)); sim.track = Math.max(6, Math.min(25, r.track / 10 || 11.2));
-    sim.yawSign = r.yaw === -1 ? -1 : 1; sim.real = r.real; sim.rollError();
+    sim.yawSign = r.yaw === -1 ? -1 : 1; SP.yawSign = sim.yawSign; sim.real = r.real; sim.rollError();
     autosave();
   }
   ['set-wheel', 'set-track', 'set-yaw', 'set-real'].forEach((id) => { $(id).onchange = () => applySettings(readSettings()); });
@@ -305,6 +305,21 @@
       IF0: { block: eq('sp_color_is', { PORT: 'C', COLOR: 'black' }) }, DO0: { block: eq('sp_steer', null, { STEER: nb(35) }) }, ELSE: { block: eq('sp_steer', null, { STEER: nb(-35) }) } }) } }))) ] } } },
     { name: '看到紅色就停', desc: '開始前進，等到顏色感測器看到紅色就停止並發出嗶聲。', scene: 'colors', color: '#ff8c1a', ws: { blocks: { languageVersion: 0, blocks: [eq('sp_start', null, null, eq('sp_start_move', { DIR: '1' }, null,
       eq('sp_wait_until', null, { C: { block: eq('sp_color_is', { PORT: 'C', COLOR: 'red' }) } }, eq('sp_stop', null, null, eq('sp_beep', null, { NOTE: nb(72), S: nb(0.5) }))))) ] } } },
+    { name: 'Python：前進再後退', desc: '用 move_for_degrees 前進 40 公分、再後退 40 公分（負的度數代表反方向）。', scene: 'blank', color: '#3d4357', py: [
+      'from hub import port', 'import runloop, motor_pair', '', '# 輪子轉一圈大約走 17.6 公分', 'def degrees_for_distance(cm):', '    return int(cm / 17.6 * 360)', '',
+      'async def main():', '    motor_pair.pair(motor_pair.PAIR_1, port.A, port.B)',
+      '    await motor_pair.move_for_degrees(motor_pair.PAIR_1, degrees_for_distance(40), 0)',
+      '    await motor_pair.move_for_degrees(motor_pair.PAIR_1, degrees_for_distance(-40), 0)', '', 'runloop.run(main())', ''].join('\n') },
+    { name: 'Python：循線（比例控制）', desc: '偏離黑線邊緣多少，就轉向修正多少。場地選「循線」，顏色感測器接 C。', scene: 'line', color: '#3d4357', py: [
+      'from hub import port', 'import runloop, motor_pair, color_sensor', '',
+      'async def main():', '    motor_pair.pair(motor_pair.PAIR_1, port.A, port.B)', '    while True:',
+      '        # 黑線邊緣的反射光大約是 50', '        error = 50 - color_sensor.reflection(port.C)',
+      '        motor_pair.move(motor_pair.PAIR_1, int(error * 0.5), velocity=300)', '', 'runloop.run(main())', ''].join('\n') },
+    { name: 'Python：陀螺儀直走', desc: '用轉向角度修正方向。執行中拖曳或旋轉機器人，看它能不能自己轉回來。', scene: 'blank', color: '#3d4357', py: [
+      'from hub import port, motion_sensor', 'import runloop, motor_pair', '',
+      'async def main():', '    motor_pair.pair(motor_pair.PAIR_1, port.A, port.B)', '    motion_sensor.reset_yaw(0)', '    while True:',
+      '        # tilt_angles()[0] 是轉向角度（單位 0.1 度，逆時針為正）', '        correction = int(motion_sensor.tilt_angles()[0] * 0.2)',
+      '        motor_pair.move(motor_pair.PAIR_1, correction, velocity=200)', '', 'runloop.run(main())', ''].join('\n') },
   ];
   function tile(parent, title, desc, color, glyph, fn) {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'tile';
@@ -318,7 +333,9 @@
     tile($('tiles-start'), '新專案', '從空白開始，只有「當程式開始」。', '#4c97ff', '+', () => restore({ workspace: { blocks: { languageVersion: 0, blocks: [{ type: 'sp_start', x: 40, y: 40 }] } }, name: '未命名專案' }));
     if (saved && saved.workspace) tile($('tiles-start'), '繼續：' + (saved.name || '未命名專案'), '回到上次編輯的內容。', '#2fb85f', '>', () => restore(saved));
     tile($('tiles-start'), '開啟檔案', '開啟之前儲存的 .json。', '#9966ff', '↑', () => $('file-open').click());
-    SAMPLES.forEach((s) => tile($('tiles-sample'), s.name, s.desc, s.color, '▶', () => restore({ name: s.name, workspace: s.ws, scene: s.scene })));
+    SAMPLES.forEach((s) => tile($('tiles-sample'), s.name, s.desc, s.color, s.py ? 'Py' : '▶', () => restore(s.py
+      ? { name: s.name, workspace: { blocks: { languageVersion: 0, blocks: [{ type: 'sp_start', x: 40, y: 40 }] } }, scene: s.scene, mode: 'python', py: s.py, pyDirty: true }
+      : { name: s.name, workspace: s.ws, scene: s.scene })));
   }
   $('btn-home').onclick = () => { stopProgram(); let sv = null; try { sv = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { /* 略 */ } buildHome(sv); $('home').hidden = false; };
 

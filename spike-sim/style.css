@@ -102,7 +102,7 @@ dialog li { margin: 6px 0; line-height: 1.55; }
 .setgrid .wide { grid-column: 1 / -1; }
 .setgrid input[type=number] { font: 700 13px var(--font); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; width: 100%; color: var(--ink); }
 
-#home { position: fixed; inset: 0; z-index: 100; background: linear-gradient(180deg, #fff8d6 0, #eef1f6 40%); overflow-y: auto; }
+#home { position: fixed; inset: 0; z-index: 1000; background: linear-gradient(180deg, #fff8d6 0, #eef1f6 40%); overflow-y: auto; }
 .home-in { max-width: 980px; margin: 0 auto; padding: 40px 24px; }
 .home-brand { display: flex; align-items: center; gap: 12px; }
 .home-brand h1 { margin: 0; font-size: 32px; }
@@ -146,3 +146,5 @@ dialog li { margin: 6px 0; line-height: 1.55; }
 
 .blocklyToolboxCategory { width: 100%; }
 .blocklyTreeLabel { white-space: nowrap; }
+
+.tile .dot { font-size: 15px; }

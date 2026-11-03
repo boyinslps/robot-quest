@@ -94,7 +94,7 @@
       this.trail = document.createElement('canvas'); this.trail.width = W * PX; this.trail.height = H * PX;
       this.mL = { dps: 0, deg: 0 }; this.mR = { dps: 0, deg: 0 };
       this.simTime = 0; this.timerOff = 0; this.yawOff = 0; this.lastMoveT = 0;
-      this.waiters = []; this.pending = 0; this.acc = 0; this.mul = 1; this.pumping = false;
+      this.waiters = []; this.pending = 0; this.aborted = false; this.acc = 0; this.mul = 1; this.pumping = false;
       this.penOn = true; this.showSensors = true; this.display = ''; this.onDisplay = null;
       this.speedPct = 50; this.msgs = {};
       this.wheelD = WHEEL_D; this.track = TRACK; this.real = false; this.yawSign = 1; this.scaleL = 1; this.scaleR = 1;
@@ -196,8 +196,8 @@
         }
       } finally { this.pumping = false; }
     }
-    waitUntil(pred) { if (this.pending > 0) this.pending--; return new Promise((res, rej) => { this.waiters.push({ pred, res, rej }); }); }
-    abort() { const ws = this.waiters; this.waiters = []; ws.forEach((w) => w.rej(STOP)); this.stopAll(); }
+    waitUntil(pred) { if (this.aborted) return Promise.reject(STOP); if (this.pending > 0) this.pending--; return new Promise((res, rej) => { this.waiters.push({ pred, res, rej }); }); }
+    abort() { this.aborted = true; const ws = this.waiters; this.waiters = []; ws.forEach((w) => w.rej(STOP)); this.stopAll(); }
     stalled() { return this.simTime - this.lastMoveT > 1.5; }
 
     /* --- 感測 --- */
@@ -290,6 +290,16 @@
     const clamp = (v) => Math.max(-100, Math.min(100, num(v)));
     const wait = (s) => { const t = sim.simTime + Math.max(0, num(s)); return sim.waitUntil(() => sim.simTime >= t); };
     let audio = null, seen = {};
+    async function driveDeg(deg, l, r) {
+      deg = Math.abs(num(deg)); const big = Math.max(Math.abs(l), Math.abs(r)); if (!big || !deg) return;
+      const d0 = [sim.mL.deg, sim.mR.deg]; sim.lastMoveT = sim.simTime;
+      await sim.waitUntil(() => {
+        const rem = deg - Math.max(Math.abs(sim.mL.deg - d0[0]), Math.abs(sim.mR.deg - d0[1]));
+        if (rem <= 0.3 || sim.stalled()) return true;
+        const k = Math.min(1, Math.max(0.04, rem * 0.5 / big)); sim.drive(l * k, r * k); return false;
+      });
+      sim.stopAll();
+    }
     const need = (p, type) => {
       if (sim.ports[p] !== type) {
         const nm = { color: '顏色感測器', distance: '距離感測器', force: '力感測器' }[type];
@@ -342,17 +352,10 @@
       },
       // 馬達組：按「馬達轉的度數」或「時間」移動（Python 模式使用）
       async moveDegrees(deg, steer, pct) {
-        deg = Math.abs(num(deg)); pct = clamp(pct); steer = clamp(steer); if (!pct || !deg) return;
-        const l = pct * (steer > 0 ? 1 : 1 + steer / 50), r = pct * (steer < 0 ? 1 : 1 - steer / 50);
-        const big = Math.max(Math.abs(l), Math.abs(r)), d0 = [sim.mL.deg, sim.mR.deg]; sim.lastMoveT = sim.simTime;
-        await sim.waitUntil(() => {
-          const done = Math.max(Math.abs(sim.mL.deg - d0[0]), Math.abs(sim.mR.deg - d0[1]));
-          const rem = deg - done;
-          if (rem <= 0.3 || sim.stalled()) return true;
-          const k = Math.min(1, Math.max(0.04, rem * 0.05 / (big / 10 || 1))); sim.drive(l * k, r * k); return false;
-        });
-        sim.stopAll();
+        pct = clamp(pct); steer = clamp(steer);
+        return driveDeg(deg, pct * (steer > 0 ? 1 : 1 + steer / 50), pct * (steer < 0 ? 1 : 1 - steer / 50));
       },
+      async tankDegrees(deg, l, r) { return driveDeg(deg, clamp(l), clamp(r)); },
       async moveTime(ms, steer, pct) {
         pct = clamp(pct); steer = clamp(steer);
         sim.drive(pct * (steer > 0 ? 1 : 1 + steer / 50), pct * (steer < 0 ? 1 : 1 - steer / 50));
@@ -362,7 +365,8 @@
       motorSetPos(p, v) { (p === 'A' ? sim.mL : sim.mR).deg = num(v); },
       distMm: (p) => { need(p, 'distance'); return sim.distanceMm(); },
       colorKey: (p) => { need(p, 'color'); return sim.color(); },
-      yawDeci: () => sim.yaw() * 10,
+      yawDeci: () => Math.round(-((sim.th - sim.yawOff) * 1800 / Math.PI)),
+      motorVel: (p) => Math.round((p === 'A' ? sim.mL : sim.mR).cur || 0),
       ticksMs: () => Math.round(sim.simTime * 1000),
       stopSim() { sim.abort(); },
       motorStart(port, p) { const v = clamp(p) * 10; if (port === 'A' || port === 'AB') sim.mL.dps = v; if (port === 'B' || port === 'AB') sim.mR.dps = v; },
@@ -381,7 +385,7 @@
       motorStop(p) { if (p === 'A' || p === 'AB') sim.mL.dps = 0; if (p === 'B' || p === 'AB') sim.mR.dps = 0; },
       say: (t) => io.say(t),
       broadcast(m) { sim.msgs[m] = (sim.msgs[m] || 0) + 1; },
-      resetRun() { sim.msgs = {}; seen = {}; },
+      resetRun() { sim.msgs = {}; seen = {}; sim.aborted = false; },
       async waitMsg(m, who) {
         const k = who + '|' + m;
         await sim.waitUntil(() => (sim.msgs[m] || 0) > (seen[k] || 0));

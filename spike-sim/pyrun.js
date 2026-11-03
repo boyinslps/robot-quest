@@ -5,7 +5,7 @@
   const BASE = (window.SP_PYODIDE_BASE || 'https://cdn.jsdelivr.net/pyodide/v' + VER + '/full/');
 
   const PRELUDE = `
-import sys, types, asyncio
+import sys, types, asyncio, ast, inspect
 import _sp
 
 def _mod(name, **attrs):
@@ -51,6 +51,8 @@ class _Motion:
         return (_sp.yawDeci(), 0, 0)
     def reset_yaw(self, angle=0):
         _sp.resetYaw()
+    def stable(self):
+        return True
 motion_sensor = _Motion()
 
 class _Sound:
@@ -75,7 +77,16 @@ class _Runloop:
     async def sleep_ms(self, ms):
         await _sp.wait(ms / 1000)
     async def until(self, function, timeout=0):
-        await _sp.until(function)
+        t0 = _sp.ticksMs()
+        while True:
+            ok = function()
+            if inspect.isawaitable(ok):
+                ok = await ok
+            if ok:
+                return
+            if timeout and _sp.ticksMs() - t0 >= timeout:
+                return
+            await _sp.wait(0)
     async def _drain(self):
         if _q:
             await asyncio.gather(*list(_q))
@@ -96,11 +107,15 @@ class _MotorPair:
     def move(self, pair, steering, *, velocity=360, acceleration=1000):
         self._chk(); _sp.mpMove(steering, velocity)
     async def move_for_degrees(self, pair, degrees, steering, *, velocity=360, stop=1, acceleration=1000, deceleration=1000):
-        self._chk(); await _sp.mpMoveDeg(degrees, steering, velocity)
+        self._chk(); await _sp.mpMoveDeg(abs(degrees), steering, velocity if degrees >= 0 else -velocity)
     async def move_for_time(self, pair, duration, steering, *, velocity=360, stop=1, acceleration=1000, deceleration=1000):
         self._chk(); await _sp.mpMoveTime(duration, steering, velocity)
     def move_tank(self, pair, left_velocity, right_velocity, *, acceleration=1000):
         self._chk(); _sp.mpTank(left_velocity, right_velocity)
+    async def move_tank_for_degrees(self, pair, degrees, left_velocity, right_velocity, *, stop=1, acceleration=1000, deceleration=1000):
+        self._chk()
+        s = 1 if degrees >= 0 else -1
+        await _sp.mpTankDeg(abs(degrees), s * left_velocity, s * right_velocity)
     def stop(self, pair, *, stop=1):
         _sp.mpStop()
 motor_pair = _MotorPair()
@@ -111,11 +126,13 @@ class _Motor:
     def run(self, p, velocity, *, acceleration=1000):
         _sp.motorRun(_need_ab(p), velocity)
     async def run_for_degrees(self, p, degrees, velocity, *, stop=1, acceleration=1000, deceleration=1000):
-        await _sp.motorDeg(_need_ab(p), degrees, velocity)
+        await _sp.motorDeg(_need_ab(p), abs(degrees), velocity if degrees >= 0 else -velocity)
     def stop(self, p, *, stop=1):
         _sp.motorStop(_need_ab(p))
     def relative_position(self, p):
         return _sp.motorPos(_need_ab(p))
+    def velocity(self, p):
+        return _sp.motorVel(_need_ab(p))
     def reset_relative_position(self, p, position=0):
         _sp.motorSetPos(_need_ab(p), position)
 motor = _Motor()
@@ -147,6 +164,42 @@ _mod("force_sensor", pressed=force_sensor.pressed, force=force_sensor.force)
 
 import time as _time
 _time.ticks_ms = _sp.ticksMs
+
+# 真正的主機有獨立的執行緒，while True 裡不寫 await 也可以；瀏覽器不行。
+# 所以執行前在每個（位於 async def 或最外層的）迴圈開頭自動插入 await，讓模擬器前進一步。
+async def _spike_tick():
+    await _sp.wait(0)
+
+class _AddTick(ast.NodeTransformer):
+    def __init__(self):
+        self.ok = [True]
+    def visit_FunctionDef(self, node):
+        self.ok.append(False); self.generic_visit(node); self.ok.pop(); return node
+    def visit_Lambda(self, node):
+        return node
+    def visit_AsyncFunctionDef(self, node):
+        self.ok.append(True); self.generic_visit(node); self.ok.pop(); return node
+    def _loop(self, node):
+        self.generic_visit(node)
+        if self.ok[-1]:
+            t = ast.Expr(ast.Await(ast.Call(ast.Name("__spike_tick__", ast.Load()), [], [])))
+            ast.copy_location(t, node.body[0]); ast.copy_location(t.value, node.body[0]); ast.copy_location(t.value.value, node.body[0])
+            ast.copy_location(t.value.value.func, node.body[0])
+            node.body.insert(0, t)
+        return node
+    visit_While = _loop
+    visit_For = _loop
+    visit_AsyncFor = _loop
+
+async def _spike_exec(src):
+    tree = ast.parse(src, "<exec>")
+    tree = _AddTick().visit(tree)
+    ast.fix_missing_locations(tree)
+    code = compile(tree, "<exec>", "exec", flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT)
+    g = {"__name__": "__main__", "__spike_tick__": _spike_tick}
+    r = eval(code, g)
+    if inspect.iscoroutine(r):
+        await r
 `;
 
   const ZH = [
@@ -170,7 +223,7 @@ _time.ticks_ms = _sp.ticksMs
     return last;
   }
 
-  let pyodide = null, loading = null, stopped = false;
+  let pyodide = null, loading = null, stopped = false, quiet = false, warned = new Set();
   function loadScript(src) {
     return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('無法載入 Pyodide（需要網路）：' + src)); document.head.appendChild(s); });
   }
@@ -192,9 +245,9 @@ _time.ticks_ms = _sp.ticksMs
       lightPattern: (n) => api.lightPattern(n), lightText: (t) => api.lightText(t), lightOff: () => api.lightOff(),
       lightPixel: (x, y, b) => api.lightPixel(x, y, b),
       wait: (s) => api.wait(s), until: (fn) => api.waitUntil(() => !!fn()),
-      yawDeci: () => api.yaw() * 10, resetYaw: () => api.resetYaw(), ticksMs: () => api.ticksMs(),
+      yawDeci: () => api.yawDeci(), resetYaw: () => api.resetYaw(), ticksMs: () => api.ticksMs(),
       beepHz: (f, s) => api.beepHz(f, s),
-      mpMove: (st, v) => api.steer(pct(v), st), mpStop: () => api.stop(), mpTank: (l, r) => api.tank(pct(l), pct(r)),
+      mpMove: (st, v) => api.steer(pct(v), st), mpStop: () => api.stop(), mpTank: (l, r) => api.tank(pct(l), pct(r)), mpTankDeg: (d, l, r) => api.tankDegrees(d, pct(l), pct(r)), motorVel: (p) => api.motorVel(p),
       mpMoveDeg: (d, st, v) => api.moveDegrees(d, st, pct(v)), mpMoveTime: (ms, st, v) => api.moveTime(ms, st, pct(v)),
       motorRun: (p, v) => api.motorStart(p, pct(v)), motorDeg: (p, d, v) => api.motorTurnAt(p, d, pct(v)),
       motorStop: (p) => api.motorStop(p), motorPos: (p) => api.motorPos(p), motorSetPos: (p, v) => api.motorSetPos(p, v),
@@ -204,7 +257,16 @@ _time.ticks_ms = _sp.ticksMs
     pyodide.registerJsModule('_sp', m);
     pyodide.runPython(PRELUDE, { filename: '<sim>' });
     pyodide.setStdout({ batched: (s) => io.say(s) });
-    pyodide.setStderr({ batched: (s) => io.say(s) });
+    pyodide.setStderr({ batched: (s) => {
+      if (quiet) return;
+      const mt = String(s).match(/coroutine '(?:\w+\.)?(\w+)' was never awaited/);
+      const sw = String(s).match(/<exec>:(\d+): (\w+Warning): (.*)/);
+      if (mt) { if (!/^_/.test(mt[1]) && io.warn && !warned.has(mt[1])) { warned.add(mt[1]); io.warn('忘了寫 await：「' + mt[1] + '」是需要等待完成的函式，前面要加 await，否則不會執行。'); } }
+      else if (sw) {
+        const key = sw[1] + sw[3];
+        if (io.warn && !warned.has(key)) { warned.add(key); io.warn((/is/.test(sw[3]) && /literal/.test(sw[3]) ? '「is」不能用來比較數字，請改用 ==（' : '警告：') + sw[3] + (/literal/.test(sw[3]) ? '）' : ''), Number(sw[1])); }
+      } else if (!/Enable tracemalloc/.test(s)) io.say(s);
+    } });
   }
 
   // 回傳 { line, message, raw }
@@ -228,17 +290,17 @@ _time.ticks_ms = _sp.ticksMs
     async run(code, api, sim, io) {
       await ensure(io.status);
       if (!installed) { install(api, sim, io); installed = true; }
-      stopped = false; sim._pyStopped = false;
+      stopped = false; sim._pyStopped = false; warned = new Set(); quiet = false;
       pyodide.runPython('_q.clear()');
-      const g = pyodide.globals.get('dict')();
+      pyodide.globals.set('_user_src', code);
       try {
-        await pyodide.runPythonAsync(code, { globals: g, filename: '<exec>' });
-        await pyodide.runPythonAsync('await runloop._drain()');
+        await pyodide.runPythonAsync('await _spike_exec(_user_src)', { filename: '<sim>' });
+        await pyodide.runPythonAsync('await sys.modules["runloop"]._drain()', { filename: '<sim>' });
       } catch (e) {
         if (stopped || e === SP.STOP) return { stopped: true };
         if (/Stop/.test(String(e && e.message)) && sim._userStopped) return { stopped: true };
         return { error: parseError(e) };
-      } finally { g.destroy(); }
+      } finally { quiet = true; try { pyodide.runPython('import gc; gc.collect()'); } catch (e) { /* 略 */ } quiet = false; }
       return { ok: true };
     },
     stop() { stopped = true; },

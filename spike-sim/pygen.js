@@ -49,7 +49,7 @@
     return [f(b, 'OP') === '<' ? `0 <= ${d} < ${n}` : `${d} > ${n}`, PO.RELATIONAL];
   };
   S.sp_force = (b) => [`force_sensor.pressed(${PORT(f(b, 'PORT'))})`, PO.FUNCTION_CALL];
-  S.sp_yaw = () => ['motion_sensor.tilt_angles()[0] // 10', PO.MULTIPLICATIVE];
+  S.sp_yaw = () => [`round(${SP.yawSign === -1 ? '' : '-'}motion_sensor.tilt_angles()[0] / 10)`, PO.FUNCTION_CALL];
   S.sp_reset_yaw = () => 'motion_sensor.reset_yaw(0)\n';
   S.sp_timer = () => ['(time.ticks_ms() - timer_start) / 1000', PO.MULTIPLICATIVE];
   S.sp_reset_timer = () => 'timer_start = time.ticks_ms()\n';

@@ -96,6 +96,16 @@ lego quest/         Lego Quest 的規格書、原始 PDF 與壓縮檔（原始�
 | `spike-sim/pyrun.js` | Pyodide 執行環境與 SPIKE Python API 子集、Python 錯誤解析 |
 | `spike-sim/app.js`、`style.css`、`index.html` | 介面與執行流程 |
 
+### 給學生使用（線上網址）
+
+`.github/workflows/pages.yml` 會把 `spike-sim/` 部署到 GitHub Pages，學生只要開網址就能用，不用安裝任何東西。
+
+1. 把這個分支合併到 `main`（之後每次 `spike-sim/` 有更新，推到 `main` 會自動重新部署）。
+2. 到 GitHub 倉庫的 **Settings → Pages**，把 **Source** 選成 **GitHub Actions**（只需要設定一次）。
+3. 到 **Actions** 頁面確認「部署 SPIKE 模擬器」成功，網址會顯示在那裡，通常是 `https://<帳號>.github.io/robot-quest/`。
+
+學生的電腦要能連到 `cdn.jsdelivr.net`（載入 Blockly 與 Python 執行環境）。學校網路若擋這個網站，積木模式和 Python 模式都會打不開。
+
 ## Lego Quest（實體積木組裝）
 
 選拔共三關：**組裝（Lego Quest）→ 程式（Robot Quest）→ 面試**。學生拿到一袋真的樂高積木，照網站上的官方說明書把**吉他**拼出來；網站負責清點、計時、翻說明書、記錄，**作品對不對由老師現場檢查**，在後台勾選等級。
