@@ -37,7 +37,10 @@
 
   /* ---------- 場地控制 ---------- */
   SP.SCENES.forEach((s) => { const o = document.createElement('option'); o.value = s.id; o.textContent = s.name; $('scene').appendChild(o); });
-  $('scene').onchange = () => { stopProgram(); sim.loadScene($('scene').value); };
+  $('scene').onchange = () => {
+    if (sim.hasCustom() && !confirm('換場地會清掉你放的方塊、色紙和膠帶，確定要換嗎？')) { $('scene').value = sim.scene.id; return; }
+    stopProgram(); sim.loadScene($('scene').value); refreshProps(); autosave();
+  };
   $('speed').onchange = () => { sim.mul = Number($('speed').value); };
   $('btn-reset').onclick = () => { stopProgram(); sim.resetPose(); };
   $('btn-rotl').onclick = () => sim.rotateBy(-15);
@@ -45,22 +48,150 @@
   $('chk-trail').onchange = (e) => { sim.penOn = e.target.checked; };
   $('chk-cone').onchange = (e) => { sim.showSensors = e.target.checked; };
   $('btn-clear').onclick = () => sim.clearTrail();
+  const hand = $('btn-hand');       // 用手按住力感測器
+  hand.addEventListener('pointerdown', (e) => { sim.handPress = true; hand.classList.add('down'); hand.setPointerCapture(e.pointerId); });
+  const handUp = () => { sim.handPress = false; hand.classList.remove('down'); };
+  hand.addEventListener('pointerup', handUp); hand.addEventListener('pointercancel', handUp); hand.addEventListener('lostpointercapture', handUp);
 
-  let dragging = null;
+  /* ---------- 布置場地 ---------- */
+  let editing = false, tool = 'select', drag = null;
   const stage = $('stage');
+  const snap = (v) => ($('chk-snap').checked ? Math.round(v / 5) * 5 : Math.round(v));
+  const clampX = (v) => Math.max(0, Math.min(300, v)), clampY = (v) => Math.max(0, Math.min(200, v));
+  const HINT = {
+    select: '拖曳機器人、方塊或貼紙移動它；點一下可以改大小、刪除',
+    box: '在場地上拖曳畫出方塊（機器人推得動）；點一下放一個 10 公分的方塊',
+    wall: '在場地上拖曳畫出牆（推不動）',
+    patch: '拖曳貼出色紙（顏色感測器看得到）；點一下貼一張 15 公分的色紙',
+    tape: '拖曳貼出一條膠帶線（寬 1.9 公分）',
+    erase: '點一下要刪除的物件',
+  };
+  function setEditing(on) {
+    editing = on; sim.editing = on; sim.showGrid = on;
+    $('editbar').hidden = !on; $('btn-edit').setAttribute('aria-pressed', on ? 'true' : 'false');
+    stage.classList.toggle('editing', on && tool !== 'select');
+    if (!on) { sim.selected = null; sim.preview = null; }
+    $('hintline').textContent = on ? HINT[tool] : '拖曳機器人或方塊可以移動它們';
+    refreshProps();
+  }
+  $('btn-edit').onclick = () => setEditing(!editing);
+  document.querySelectorAll('.tool').forEach((b) => { b.onclick = () => {
+    tool = b.dataset.tool; document.querySelectorAll('.tool').forEach((x) => x.classList.toggle('on', x === b));
+    stage.classList.toggle('editing', editing && tool !== 'select'); $('hintline').textContent = HINT[tool]; sim.preview = null;
+  }; });
+  $('btn-setstart').onclick = () => { sim.setStartFromPose(); $('hintline').textContent = '已把機器人現在的位置當成起點（按「重設位置」會回到這裡）'; autosave(); };
+  $('btn-clearcustom').onclick = () => { if (!sim.hasCustom() || confirm('要清掉你放的所有方塊、色紙和膠帶嗎？')) { sim.clearCustom(); refreshProps(); autosave(); } };
+
+  function selectedKind() {
+    const it = sim.selected; if (!it) return null;
+    return it.k === 'line' ? 'line' : it.k === 'patch' ? 'patch' : 'rect';
+  }
+  function refreshProps() {
+    const it = sim.selected, kind = selectedKind();
+    $('props').hidden = !editing || !it;
+    if (!editing || !it) return;
+    $('props-title').textContent = kind === 'line' ? '膠帶線' : kind === 'patch' ? '色紙' : (it.user && it.kind === 'wall') || (!it.push && !it.user) ? '牆／固定物件' : '方塊';
+    $('prop-w').parentElement.hidden = kind === 'line'; $('prop-h').parentElement.hidden = kind === 'line';
+    $('prop-push-wrap').hidden = kind !== 'rect';
+    if (kind !== 'line') { $('prop-w').value = Math.round(it.w); $('prop-h').value = Math.round(it.h); }
+    if (kind === 'rect') $('prop-push').checked = !!it.push;
+    $('prop-del').disabled = kind === 'rect' && !it.user;
+  }
+  const applySize = () => {
+    const it = sim.selected; if (!it || it.k === 'line') return;
+    const w = Math.max(2, Math.min(300, Number($('prop-w').value) || it.w)), h = Math.max(2, Math.min(200, Number($('prop-h').value) || it.h));
+    it.w = w; it.h = h; if (it.x + w > 300) it.x = 300 - w; if (it.y + h > 200) it.y = 200 - h;
+    if (it.k === 'patch') sim.redrawBg(); else { it.ox = it.x; it.oy = it.y; }
+    autosave();
+  };
+  $('prop-w').onchange = applySize; $('prop-h').onchange = applySize;
+  $('prop-push').onchange = () => { const it = sim.selected; if (it && selectedKind() === 'rect') { it.push = $('prop-push').checked; it.fill = it.push ? '#c9a26b' : '#4b4f57'; if (it.user) it.kind = it.push ? 'box' : 'wall'; autosave(); } };
+  const deleteSelected = () => { const it = sim.selected; if (!it || (it.ox !== undefined && !it.user)) return; sim.removeItem(it); refreshProps(); autosave(); };
+  $('prop-del').onclick = deleteSelected;
+  document.addEventListener('keydown', (e) => {
+    if (!editing || !sim.selected) return;
+    if ((e.key === 'Delete' || e.key === 'Backspace') && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) { e.preventDefault(); deleteSelected(); }
+  });
+
   stage.addEventListener('pointerdown', (ev) => {
-    const [cx, cy] = sim.toCm(ev), p = sim.pick(cx, cy);
-    if (!p) return;
-    dragging = p; stage.setPointerCapture(ev.pointerId); stage.classList.add('drag');
-  });
-  stage.addEventListener('pointermove', (ev) => {
-    if (!dragging) return;
     const [cx, cy] = sim.toCm(ev);
-    if (dragging.robot) { sim.x = Math.max(8, Math.min(292, cx)); sim.y = Math.max(8, Math.min(192, cy)); sim.lastMoveT = sim.simTime; }
-    else { const r = dragging.rect; r.x = Math.max(0, Math.min(300 - r.w, cx - dragging.dx)); r.y = Math.max(0, Math.min(200 - r.h, cy - dragging.dy)); }
+    if (editing && ['box', 'wall', 'patch', 'tape'].includes(tool)) {
+      drag = { mode: 'draw', x0: snap(clampX(cx)), y0: snap(clampY(cy)), x1: cx, y1: cy };
+      stage.setPointerCapture(ev.pointerId); updatePreview(cx, cy); return;
+    }
+    const hit = sim.hitItem(cx, cy, editing && tool === 'erase');
+    if (editing && tool === 'erase') {
+      if (hit && (hit.type === 'floor' || (hit.type === 'rect' && hit.item.user))) { sim.removeItem(hit.item); refreshProps(); autosave(); }
+      return;
+    }
+    if (!hit) { if (editing) { sim.selected = null; refreshProps(); } return; }
+    if (hit.type === 'floor' && !editing) return;       // 沒在布置時不能拖貼紙
+    if (hit.type !== 'robot' && editing) { sim.selected = hit.item; refreshProps(); } else if (editing) { sim.selected = null; refreshProps(); }
+    drag = { mode: 'move', hit, last: [cx, cy] }; stage.setPointerCapture(ev.pointerId); stage.classList.add('drag');
   });
-  const endDrag = () => { dragging = null; stage.classList.remove('drag'); };
+  function updatePreview(cx, cy) {
+    const d = drag, x0 = d.x0, y0 = d.y0, x1 = snap(clampX(cx)), y1 = snap(clampY(cy));
+    const col = $('paint-color').value;
+    if (tool === 'tape') sim.preview = { k: 'line', x1: x0, y1: y0, x2: x1, y2: y1, w: 1.9, color: col };
+    else {
+      const x = Math.min(x0, x1), y = Math.min(y0, y1), w = Math.abs(x1 - x0), h = Math.abs(y1 - y0);
+      sim.preview = tool === 'patch' ? { k: 'patch', x, y, w: Math.max(w, 1), h: Math.max(h, 1), color: col }
+        : { x, y, w: Math.max(w, 1), h: Math.max(h, 1), fill: tool === 'wall' ? '#4b4f57' : '#c9a26b' };
+    }
+    d.x1 = x1; d.y1 = y1;
+  }
+  stage.addEventListener('pointermove', (ev) => {
+    if (!drag) return;
+    const [cx, cy] = sim.toCm(ev);
+    if (drag.mode === 'draw') { updatePreview(cx, cy); return; }
+    const h = drag.hit;
+    if (h.type === 'robot') { sim.x = Math.max(8, Math.min(292, cx)); sim.y = Math.max(8, Math.min(192, cy)); sim.lastMoveT = sim.simTime; }
+    else if (h.type === 'rect') {
+      const r = h.item; r.x = Math.max(0, Math.min(300 - r.w, cx - h.dx)); r.y = Math.max(0, Math.min(200 - r.h, cy - h.dy));
+      if (!running) { r.ox = r.x; r.oy = r.y; }
+    } else if (h.type === 'floor') { sim.moveFloor(h.item, cx - drag.last[0], cy - drag.last[1]); drag.last = [cx, cy]; }
+  });
+  const endDrag = () => {
+    if (drag && drag.mode === 'draw' && sim.preview) {
+      const p = sim.preview; sim.preview = null; let it = null;
+      if (tool === 'tape') { if (Math.hypot(p.x2 - p.x1, p.y2 - p.y1) >= 3) it = sim.addFloor({ k: 'line', x1: p.x1, y1: p.y1, x2: p.x2, y2: p.y2, w: 1.9, color: p.color }); }
+      else {
+        let { x, y, w, h } = p; const def = tool === 'patch' ? 15 : 10;
+        if (w < 3 || h < 3) { w = def; h = def; x = clampX(drag.x0 - w / 2); y = clampY(drag.y0 - h / 2); }
+        x = Math.max(0, Math.min(300 - w, x)); y = Math.max(0, Math.min(200 - h, y));
+        it = tool === 'patch' ? sim.addFloor({ k: 'patch', x, y, w, h, color: p.color }) : sim.addRect(tool === 'wall' ? 'wall' : 'box', x, y, w, h);
+      }
+      if (it) { sim.selected = it; refreshProps(); autosave(); }
+    } else if (drag && drag.mode === 'move') autosave();
+    drag = null; stage.classList.remove('drag');
+  };
   stage.addEventListener('pointerup', endDrag); stage.addEventListener('pointercancel', endDrag);
+
+  /* ---------- 場地／3D 分頁、全螢幕 ---------- */
+  let view = '2d';
+  function showView(v) {
+    view = v;
+    $('vt-2d').classList.toggle('on', v === '2d'); $('vt-3d').classList.toggle('on', v === '3d');
+    $('wrap2d').hidden = v !== '2d'; $('wrap3d').hidden = v !== '3d'; $('stagebar2d').hidden = v !== '2d';
+    $('btn-edit').hidden = v !== '2d'; if (v !== '2d') { $('editbar').hidden = true; } else $('editbar').hidden = !editing;
+    if (v === '3d') start3d(); else if (SP.car3d) SP.car3d.stop();
+  }
+  function start3d() {
+    const note = $('v3note');
+    const go = () => { SP.car3d.start($('three-host')); note.textContent = '示意模型（尺寸依模擬器：輪徑 5.6 公分、輪距 11.2 公分），不是官方三視圖。程式跑起來輪子會跟著轉。'; };
+    if (SP.car3d) { go(); return; }
+    note.textContent = '正在載入 3D 模組…';
+    const t = setTimeout(() => { if (!SP.car3d) note.textContent = location.protocol === 'file:' ? '3D 預覽需要用網址開啟：瀏覽器不允許「雙擊檔案開啟」載入 3D 模組。請改用線上網址，或在資料夾裡開一個本機網頁伺服器。' : '3D 模組載入失敗（需要網路連到 cdn.jsdelivr.net）。'; }, location.protocol === 'file:' ? 1500 : 12000);
+    document.addEventListener('car3d-ready', () => { clearTimeout(t); if (view === '3d') go(); }, { once: true });
+  }
+  $('vt-2d').onclick = () => showView('2d'); $('vt-3d').onclick = () => showView('3d');
+  document.querySelectorAll('.v3bar [data-view]').forEach((b) => { b.onclick = () => SP.car3d && SP.car3d.setView(b.dataset.view); });
+  $('btn-fs').onclick = async () => {
+    try { if (document.fullscreenElement) await document.exitFullscreen(); else await $('stage-card').requestFullscreen(); }
+    catch (e) { $('hintline').textContent = '這個瀏覽器不允許全螢幕：' + e.message; }
+  };
+  document.addEventListener('fullscreenchange', () => { $('btn-fs').textContent = document.fullscreenElement ? '離開全螢幕' : '全螢幕'; });
+  $('fs-run').onclick = () => $('btn-run').click(); $('fs-stop').onclick = () => $('btn-stop').click();
 
   /* ---------- 主機與埠 ---------- */
   const DEV = [['none', '（未連接）'], ['color', '顏色感測器'], ['distance', '距離感測器'], ['force', '力感測器']];
@@ -104,6 +235,7 @@
     $('hub-text').textContent = sim.displayText || ' ';
     $('val-yaw').textContent = '轉向角度 ' + sim.yaw() + '°';
     $('val-timer').textContent = '計時器 ' + sim.timer().toFixed(1) + ' 秒';
+    $('fs-info').textContent = '計時器 ' + sim.timer().toFixed(1) + ' 秒　轉向角度 ' + sim.yaw() + '°　距離 ' + (sim.ports.D === 'distance' ? sim.distance() + ' 公分' : '—');
   }
   setInterval(refreshHub, 100);
   for (const side of ['left', 'right']) {      // 主機的左右按鈕：按住就是按下
@@ -118,7 +250,7 @@
   const api = SP.createApi(sim, { hl: (id) => { lastBlock = id; ws.highlightBlock(id); }, say });
   const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
   let running = false;
-  function setRunning(r) { running = r; $('btn-run').hidden = r; $('btn-stop').hidden = !r; }
+  function setRunning(r) { running = r; $('btn-run').hidden = r; $('btn-stop').hidden = !r; $('fs-run').hidden = r; $('fs-stop').hidden = !r; }
   function resetHubState() {      // 程式一開始：回到官方預設值
     api.resetRun(); sim.yawOff = sim.th; sim.timerOff = sim.simTime; sim.lastMoveT = sim.simTime;
     sim.speedPct = 50; sim.motorSpeed = { A: 75, B: 75 }; sim.cmPerRot = 17.5;
@@ -288,7 +420,7 @@
 
   /* ---------- 儲存／開啟 ---------- */
   function snapshot() {
-    return { app: 'spike-sim', v: 1, name: $('proj-name').value, ports: sim.ports, scene: $('scene').value, settings: readSettings(), mode, py: pySrc.value, pyDirty, workspace: Blockly.serialization.workspaces.save(ws) };
+    return { app: 'spike-sim', v: 1, name: $('proj-name').value, ports: sim.ports, scene: $('scene').value, settings: readSettings(), field: sim.exportField(), mode, py: pySrc.value, pyDirty, workspace: Blockly.serialization.workspaces.save(ws) };
   }
   function restore(d) {
     stopProgram(); ws.clear();
@@ -299,6 +431,8 @@
     pySrc.value = d.py || ''; pyDirty = !!d.pyDirty && !!d.py; clearErrors(); showTab('out');
     setMode(d.mode === 'python' ? 'python' : 'blocks');
     if (d.scene && SP.SCENES.some((s) => s.id === d.scene)) { $('scene').value = d.scene; sim.loadScene(d.scene); }
+    if (d.field) sim.importField(d.field);
+    refreshProps();
   }
   let saveT = 0;
   function autosave() { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem(KEY, JSON.stringify(snapshot())); } catch (e) { /* 無痕模式等 */ } }, 400); }

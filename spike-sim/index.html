@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SPIKE 模擬器</title>
 <link rel="stylesheet" href="style.css">
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
 <script src="https://cdn.jsdelivr.net/npm/blockly@11.2.1/blockly_compressed.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/blockly@11.2.1/blocks_compressed.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/blockly@11.2.1/javascript_compressed.js"></script>
@@ -62,20 +63,67 @@
     </section>
 
     <aside class="side">
-      <div class="card stage-card">
+      <div class="card stage-card" id="stage-card">
         <div class="card-h">
-          <span class="card-t">模擬場地</span>
+          <div class="vtabs" role="tablist" aria-label="畫面">
+            <button type="button" id="vt-2d" class="on">場地</button>
+            <button type="button" id="vt-3d">3D 車子</button>
+          </div>
+          <span class="grow"></span>
           <label class="sel">場地 <select id="scene"></select></label>
           <label class="sel">速度 <select id="speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option></select></label>
+          <button class="pill" id="btn-edit" type="button" aria-pressed="false">布置場地</button>
+          <button class="pill" id="btn-fs" type="button">全螢幕</button>
         </div>
-        <div class="stagewrap"><canvas id="stage"></canvas><div class="hintline">拖曳機器人或紅色方塊可以移動它們</div></div>
-        <div class="stage-bar">
+
+        <div class="editbar" id="editbar" hidden>
+          <div class="tools" role="radiogroup" aria-label="工具">
+            <button type="button" class="tool on" data-tool="select" title="選取、拖曳移動物件">選取</button>
+            <button type="button" class="tool" data-tool="box" title="拖曳畫出方塊（機器人推得動）">方塊</button>
+            <button type="button" class="tool" data-tool="wall" title="拖曳畫出牆（固定不動）">牆</button>
+            <button type="button" class="tool" data-tool="patch" title="拖曳貼出色紙（顏色感測器看得到）">色紙</button>
+            <button type="button" class="tool" data-tool="tape" title="拖曳貼出一條膠帶線">膠帶</button>
+            <button type="button" class="tool" data-tool="erase" title="點物件刪除">橡皮擦</button>
+          </div>
+          <label class="sel">顏色 <select id="paint-color"><option value="black">黑色</option><option value="red">紅色</option><option value="yellow">黃色</option><option value="green">綠色</option><option value="blue">藍色</option><option value="white">白色</option></select></label>
+          <label class="chk"><input type="checkbox" id="chk-snap" checked> 對齊 5 公分</label>
+          <button class="pill" id="btn-setstart" type="button" title="把機器人現在的位置和方向當成起點">設為起點</button>
+          <button class="pill" id="btn-clearcustom" type="button">清除我放的物件</button>
+          <div class="props" id="props" hidden>
+            <span class="muted" id="props-title">物件</span>
+            <label>寬 <input type="number" id="prop-w" min="2" max="300" step="1"> 公分</label>
+            <label>高 <input type="number" id="prop-h" min="2" max="200" step="1"> 公分</label>
+            <label class="chk" id="prop-push-wrap"><input type="checkbox" id="prop-push"> 機器人推得動</label>
+            <button class="pill" id="prop-del" type="button">刪除</button>
+          </div>
+        </div>
+
+        <div class="stagewrap" id="wrap2d"><canvas id="stage"></canvas><div class="hintline" id="hintline">拖曳機器人或方塊可以移動它們</div></div>
+        <div class="view3d" id="wrap3d" hidden>
+          <div id="three-host"></div>
+          <div class="v3bar">
+            <span class="muted">滑鼠拖曳＝旋轉、滾輪＝縮放、右鍵拖曳＝平移</span>
+            <button class="pill small" data-view="iso" type="button">立體</button>
+            <button class="pill small" data-view="front" type="button">正視</button>
+            <button class="pill small" data-view="right" type="button">側視</button>
+            <button class="pill small" data-view="top" type="button">上視</button>
+            <button class="pill small" data-view="back" type="button">後視</button>
+          </div>
+          <div class="v3note" id="v3note">示意模型（尺寸依模擬器：輪徑 5.6 公分、輪距 11.2 公分），不是官方三視圖。</div>
+        </div>
+        <div class="stage-bar" id="stagebar2d">
           <button class="pill" id="btn-reset" type="button">重設位置</button>
           <button class="pill" id="btn-rotl" type="button">逆時針 15°</button>
           <button class="pill" id="btn-rotr" type="button">順時針 15°</button>
           <label class="chk"><input type="checkbox" id="chk-trail" checked> 軌跡</label>
           <button class="pill" id="btn-clear" type="button">清除軌跡</button>
           <label class="chk"><input type="checkbox" id="chk-cone" checked> 感測範圍</label>
+          <button class="pill hold" id="btn-hand" type="button" title="按住＝用手壓住力感測器">按住：用手按力感測器</button>
+        </div>
+        <div class="fs-runbar">
+          <button class="fsbtn run" id="fs-run" type="button">執行程式</button>
+          <button class="fsbtn stop" id="fs-stop" type="button" hidden>停止</button>
+          <span class="fs-info" id="fs-info"></span>
         </div>
       </div>
 
@@ -123,6 +171,7 @@
     <li><b>寫程式</b>：從左邊的類別拖積木到中間，接在「當程式開始」下面，按右下角綠色 ▶ 執行。</li>
     <li><b>機器人</b>：馬達 A 是左輪、馬達 B 是右輪（輪徑 5.6 公分、輪距 11.2 公分）。可以拖曳機器人、旋轉按鈕調整方向，「重設位置」回到起點。</li>
     <li><b>裝置</b>：C～F 埠可以選顏色、距離或力感測器。積木上的埠要和這裡的設定一致，否則會出現錯誤訊息。預設 C＝顏色、D＝距離、E＝力。</li>
+    <li><b>布置場地</b>：按「布置場地」可以拖曳畫出方塊（機器人推得動）、牆、色紙、黑線膠帶，用「橡皮擦」刪除；「設為起點」會把機器人現在的位置當起點。「全螢幕」可以放大場地，上課投影很方便。「3D 車子」可以旋轉、縮放小車，程式跑起來輪子會跟著轉。</li>
     <li><b>感測器位置</b>：顏色感測器在機器人前方底部，距離感測器在最前方中央，力感測器是前方的碰撞探針。</li>
     <li><b>轉向角度</b>：順時針為正，範圍 −180～179。程式一開始會自動歸零。</li>
     <li><b>事件積木</b>：每一個「當…」積木是一條獨立的程式，會同時執行。主機的「左」「右」按鈕可以用滑鼠按住。</li>
@@ -140,5 +189,6 @@
 <script src="pygen.js"></script>
 <script src="pyrun.js"></script>
 <script src="app.js"></script>
+<script type="module" src="car3d.js"></script>
 </body>
 </html>
