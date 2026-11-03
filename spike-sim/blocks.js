@@ -4,30 +4,32 @@
   const G = javascript.javascriptGenerator, O = javascript.Order;
 
   /* ---------- 配色（對照 SPIKE App 的類別顏色） ---------- */
+  // 顏色取自 SPIKE App 截圖（主色為實測值，下拉選單／邊框的深色用同一條公式算出）
   const COL = {
-    motion: ['#4C97FF', '#4280D7', '#3373CC'],
-    light: ['#9966FF', '#855CD6', '#774DCB'],
-    sound: ['#CF63CF', '#C94FC9', '#BD42BD'],
-    event: ['#FFBF00', '#E6AC00', '#CC9900'],
-    control: ['#FFAB19', '#EC9C13', '#CF8B17'],
-    sensor: ['#5CB1D6', '#47A8D1', '#2E8EB8'],
-    operator: ['#59C059', '#46B946', '#389438'],
-    variable: ['#FF8C1A', '#FF8000', '#DB6E00'],
-    procedure: ['#FF6680', '#FF4D6A', '#FF3355'],
+    motor: ['#0090f5', '#0073c4', '#005c9d'],
+    move: ['#ff4ccd', '#cc0494', '#a30076'],
+    light: ['#b896f8', '#7f59c6', '#61419f'],
+    sound: ['#c061f1', '#8a20c1', '#6b109a'],
+    event: ['#f5c402', '#c49c00', '#9d7d00'],
+    control: ['#ffb515', '#cc8b00', '#a37000'],
+    sensor: ['#34ccf1', '#009bc1', '#007c9a'],
+    operator: ['#00b94d', '#00943e', '#007631'],
+    variable: ['#ff8f24', '#cc6400', '#a35000'],
+    procedure: ['#ff6680', '#cc0b2b', '#a30922'],   // 截圖沒有「我的積木」，這個顏色沒有對照官方
   };
-  COL.motor = COL.motion; COL.move = COL.motion;
+  COL.motion = COL.motor;
   const style = (c) => ({ colourPrimary: c[0], colourSecondary: c[1], colourTertiary: c[2] });
   SP.theme = Blockly.Theme.defineTheme('spike', {
     base: Blockly.Themes.Zelos,
     blockStyles: {
-      motion_blocks: style(COL.motion), light_blocks: style(COL.light), sound_blocks: style(COL.sound),
+      motion_blocks: style(COL.motor), motor_blocks: style(COL.motor), move_blocks: style(COL.move), light_blocks: style(COL.light), sound_blocks: style(COL.sound),
       event_blocks: style(COL.event), control_blocks: style(COL.control), sensor_blocks: style(COL.sensor),
       operator_blocks: style(COL.operator), variable_blocks: style(COL.variable), procedure_blocks: style(COL.procedure),
       loop_blocks: style(COL.control), logic_blocks: style(COL.operator), math_blocks: style(COL.operator),
       text_blocks: style(COL.operator), variable_dynamic_blocks: style(COL.variable),
     },
     categoryStyles: {
-      motor_category: { colour: COL.motion[0] }, move_category: { colour: COL.motion[0] }, light_category: { colour: COL.light[0] },
+      motor_category: { colour: COL.motor[0] }, move_category: { colour: COL.move[0] }, light_category: { colour: COL.light[0] },
       sound_category: { colour: COL.sound[0] }, event_category: { colour: COL.event[0] },
       control_category: { colour: COL.control[0] }, sensor_category: { colour: COL.sensor[0] },
       operator_category: { colour: COL.operator[0] }, variable_category: { colour: COL.variable[0] }, procedure_category: { colour: COL.procedure[0] },
@@ -55,7 +57,7 @@
   const UNIT_MOTOR = [['圈', 'rot'], ['度', 'deg'], ['秒', 'sec']];
   const SIDE = [['左', 'left'], ['右', 'right']];
 
-  Blockly.defineBlocksWithJsonArray([
+  const DEFS = [
     /* 事件 */
     { type: 'sp_start', message0: '當程式開始', nextStatement: null, style: 'event_blocks' },
     { type: 'sp_when_color', message0: '%1 當顏色是 %2', args0: [dd('PORT', SENSOR_PORTS('C')), dd('COLOR', COLORS)], nextStatement: null, style: 'event_blocks' },
@@ -69,27 +71,27 @@
     { type: 'sp_broadcast_wait', message0: '傳送訊息 %1 並等待', args0: [{ type: 'field_input', name: 'MSG', text: '訊息1' }], ...stmt, style: 'event_blocks' },
 
     /* 馬達 */
-    { type: 'sp_motor_run', message0: '%1 轉動 %2 %3 %4', args0: [dd('PORT', PORTS('A')), dd('DIR', DIR_CW), num('N'), dd('UNIT', UNIT_MOTOR)], ...stmt, style: 'motion_blocks' },
-    { type: 'sp_motor_goto', message0: '%1 以 %2 轉到位置 %3', args0: [dd('PORT', PORTS('A')), dd('MODE', [['最短路徑', 'short'], ['順時針', 'cw'], ['逆時針', 'ccw']]), num('POS')], ...stmt, style: 'motion_blocks' },
-    { type: 'sp_motor_start', message0: '%1 開始轉動 %2', args0: [dd('PORT', PORTS('A')), dd('DIR', DIR_CW)], ...stmt, style: 'motion_blocks' },
-    { type: 'sp_motor_stop', message0: '%1 停止馬達', args0: [dd('PORT', PORTS('A'))], ...stmt, style: 'motion_blocks' },
-    { type: 'sp_motor_speed_set', message0: '%1 設定速度為 %2 %%', args0: [dd('PORT', PORTS('A')), num('P')], ...stmt, style: 'motion_blocks' },
-    { type: 'sp_motor_pos', message0: '%1 位置', args0: [dd('PORT', PORTS('A'))], output: 'Number', style: 'motion_blocks' },
-    { type: 'sp_motor_speed', message0: '%1 速度', args0: [dd('PORT', PORTS('A'))], output: 'Number', style: 'motion_blocks' },
-    { type: 'sp_motor_relpos', message0: '%1 相對位置', args0: [dd('PORT', PORTS('A'))], output: 'Number', style: 'motion_blocks' },
-    { type: 'sp_motor_setrel', message0: '將 %1 相對位置設為 %2', args0: [dd('PORT', PORTS('A')), num('N')], ...stmt, style: 'motion_blocks' },
+    { type: 'sp_motor_run', message0: '%1 轉動 %2 %3 %4', args0: [dd('PORT', PORTS('A')), dd('DIR', DIR_CW), num('N'), dd('UNIT', UNIT_MOTOR)], ...stmt, style: 'motor_blocks' },
+    { type: 'sp_motor_goto', message0: '%1 以 %2 轉到位置 %3', args0: [dd('PORT', PORTS('A')), dd('MODE', [['最短路徑', 'short'], ['順時針', 'cw'], ['逆時針', 'ccw']]), num('POS')], ...stmt, style: 'motor_blocks' },
+    { type: 'sp_motor_start', message0: '%1 開始轉動 %2', args0: [dd('PORT', PORTS('A')), dd('DIR', DIR_CW)], ...stmt, style: 'motor_blocks' },
+    { type: 'sp_motor_stop', message0: '%1 停止馬達', args0: [dd('PORT', PORTS('A'))], ...stmt, style: 'motor_blocks' },
+    { type: 'sp_motor_speed_set', message0: '%1 設定速度為 %2 %%', args0: [dd('PORT', PORTS('A')), num('P')], ...stmt, style: 'motor_blocks' },
+    { type: 'sp_motor_pos', message0: '%1 位置', args0: [dd('PORT', PORTS('A'))], output: 'Number', style: 'motor_blocks' },
+    { type: 'sp_motor_speed', message0: '%1 速度', args0: [dd('PORT', PORTS('A'))], output: 'Number', style: 'motor_blocks' },
+    { type: 'sp_motor_relpos', message0: '%1 相對位置', args0: [dd('PORT', PORTS('A'))], output: 'Number', style: 'motor_blocks' },
+    { type: 'sp_motor_setrel', message0: '將 %1 相對位置設為 %2', args0: [dd('PORT', PORTS('A')), num('N')], ...stmt, style: 'motor_blocks' },
 
     /* 移動 */
-    { type: 'sp_move', message0: '移動 %1 %2 %3', args0: [dd('DIR', DIR_FWD), num('N'), dd('UNIT', UNIT_MOVE)], ...stmt, style: 'motion_blocks' },
-    { type: 'sp_start_move', message0: '開始 %1 移動', args0: [dd('DIR', DIR_FWD)], ...stmt, style: 'motion_blocks' },
-    { type: 'sp_steer_for', message0: '以轉向 %1 移動 %2 %3', args0: [num('STEER'), num('N'), dd('UNIT', UNIT_MOVE)], ...stmt, style: 'motion_blocks' },
-    { type: 'sp_steer', message0: '以轉向 %1 開始移動', args0: [num('STEER')], ...stmt, style: 'motion_blocks' },
-    { type: 'sp_tank', message0: '開始以左輪 %1 右輪 %2 的速度移動', args0: [num('L'), num('R')], ...stmt, style: 'motion_blocks' },
-    { type: 'sp_stop', message0: '停止移動', ...stmt, style: 'motion_blocks' },
-    { type: 'sp_set_speed', message0: '設定移動速度為 %1 %%', args0: [num('P')], ...stmt, style: 'motion_blocks' },
-    { type: 'sp_set_pair', message0: '設定移動馬達為 %1', args0: [dd('PAIR', [['A + B', 'A+B'], ['B + A', 'B+A'], ['C + D', 'C+D'], ['E + F', 'E+F']])], ...stmt, style: 'motion_blocks' },
-    { type: 'sp_set_distance', message0: '設定 1 圈馬達旋轉 = %1 公分', args0: [num('CM')], ...stmt, style: 'motion_blocks' },
-    { type: 'sp_turn', message0: '向 %1 轉 %2 度（陀螺儀）', args0: [dd('DIR', [['右', '1'], ['左', '-1']]), num('DEG')], ...stmt, style: 'motion_blocks' },
+    { type: 'sp_move', message0: '移動 %1 %2 %3', args0: [dd('DIR', DIR_FWD), num('N'), dd('UNIT', UNIT_MOVE)], ...stmt, style: 'move_blocks' },
+    { type: 'sp_start_move', message0: '開始 %1 移動', args0: [dd('DIR', DIR_FWD)], ...stmt, style: 'move_blocks' },
+    { type: 'sp_steer_for', message0: '以轉向 %1 移動 %2 %3', args0: [num('STEER'), num('N'), dd('UNIT', UNIT_MOVE)], ...stmt, style: 'move_blocks' },
+    { type: 'sp_steer', message0: '以轉向 %1 開始移動', args0: [num('STEER')], ...stmt, style: 'move_blocks' },
+    { type: 'sp_tank', message0: '開始以左輪 %1 右輪 %2 的速度移動', args0: [num('L'), num('R')], ...stmt, style: 'move_blocks' },
+    { type: 'sp_stop', message0: '停止移動', ...stmt, style: 'move_blocks' },
+    { type: 'sp_set_speed', message0: '設定移動速度為 %1 %%', args0: [num('P')], ...stmt, style: 'move_blocks' },
+    { type: 'sp_set_pair', message0: '設定移動馬達為 %1', args0: [dd('PAIR', [['A + B', 'A+B'], ['B + A', 'B+A'], ['C + D', 'C+D'], ['E + F', 'E+F']])], ...stmt, style: 'move_blocks' },
+    { type: 'sp_set_distance', message0: '設定 1 圈馬達旋轉 = %1 公分', args0: [num('CM')], ...stmt, style: 'move_blocks' },
+    { type: 'sp_turn', message0: '向 %1 轉 %2 度（陀螺儀）', args0: [dd('DIR', [['右', '1'], ['左', '-1']]), num('DEG')], ...stmt, style: 'move_blocks' },
 
     /* 燈光 */
     { type: 'sp_light_image', message0: '亮起 %1', args0: [dd('IMG', SP.imageOptions())], ...stmt, style: 'light_blocks' },
@@ -135,7 +137,7 @@
     { type: 'sp_reset_timer', message0: '重設計時器', ...stmt, style: 'sensor_blocks' },
     { type: 'sp_force', message0: '%1 被按下 ?（舊）', args0: [dd('PORT', SENSOR_PORTS('E'))], output: 'Boolean', style: 'sensor_blocks' },
     { type: 'sp_dist_less', message0: '%1 距離 %2 %3 公分 ?（舊）', args0: [dd('PORT', SENSOR_PORTS('D')), dd('OP', [['小於', '<'], ['大於', '>']]), num('N')], output: 'Boolean', style: 'sensor_blocks' },
-    { type: 'sp_motor_turn', message0: '馬達 %1 轉 %2 度（舊）', args0: [dd('PORT', PORTS('A')), num('DEG')], ...stmt, style: 'motion_blocks' },
+    { type: 'sp_motor_turn', message0: '馬達 %1 轉 %2 度（舊）', args0: [dd('PORT', PORTS('A')), num('DEG')], ...stmt, style: 'motor_blocks' },
 
     /* 運算（官方有、Blockly 沒有的） */
     { type: 'sp_between', message0: '%1 介於 %2 和 %3 之間 ?', args0: [num('A'), num('B'), num('C')], output: 'Boolean', style: 'operator_blocks' },
@@ -143,7 +145,33 @@
     { type: 'sp_letter', message0: '第 %1 個字元，在 %2', args0: [num('N'), { type: 'input_value', name: 'T' }], output: 'String', style: 'operator_blocks' },
     { type: 'sp_length', message0: '%1 的長度', args0: [{ type: 'input_value', name: 'T' }], output: 'Number', style: 'operator_blocks' },
     { type: 'sp_contains', message0: '%1 包含 %2 ?', args0: [{ type: 'input_value', name: 'T' }, { type: 'input_value', name: 'C' }], output: 'Boolean', style: 'operator_blocks' },
-  ]);
+  ];
+  Blockly.defineBlocksWithJsonArray(DEFS);
+
+  /* 積木左邊的白色圓形圖示（官方風格：馬達＝轉輪、移動＝雙輪、燈光＝燈陣、聲音＝喇叭、事件、感測＝眼睛） */
+  const icon = (c, inner) => 'data:image/svg+xml,' + encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26"><circle cx="13" cy="13" r="12.5" fill="#fff"/><g fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${inner}</g></svg>`);
+  const dots = (c, pts, r = 1.3) => pts.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${c}" stroke="none"/>`).join('');
+  const ICONS = {
+    motor_blocks: (c) => icon(c, `<circle cx="13" cy="13" r="7.5"/>${dots(c, [[13, 8.8], [13, 17.2], [8.8, 13], [17.2, 13]], 1.5)}`),
+    move_blocks: (c) => icon(c, `<circle cx="9.5" cy="13" r="5.5"/><circle cx="16.5" cy="13" r="5.5"/>${dots(c, [[9.5, 10.5], [9.5, 15.5], [16.5, 10.5], [16.5, 15.5]], 1.1)}`),
+    light_blocks: (c) => icon(c, dots(c, [6.5, 13, 19.5].flatMap((y) => [6.5, 13, 19.5].map((x) => [x, y])), 1.6)),
+    sound_blocks: (c) => icon(c, `<path d="M6 10.5v5h3l4.5 3.5v-12L9 10.5z" fill="${c}"/><path d="M16 10a4 4 0 0 1 0 6M18.5 7.5a7.5 7.5 0 0 1 0 11"/>`),
+    event_blocks: (c) => icon(c, `<path d="M8.5 19V7"/><path d="M8.5 7.5h9l-2.2 3 2.2 3h-9" fill="${c}"/>`),
+    sensor_blocks: (c) => icon(c, `<path d="M4.5 13s3.5-5.5 8.5-5.5S21.5 13 21.5 13 18 18.5 13 18.5 4.5 13 4.5 13z"/><circle cx="13" cy="13" r="2.4" fill="${c}"/>`),
+  };
+  const NO_ICON = new Set(['sp_start', 'sp_when_message', 'sp_broadcast', 'sp_broadcast_wait', 'sp_say', 'sp_when_cond', 'sp_when_timer']);
+  DEFS.forEach((d) => {
+    const mk = ICONS[d.style];
+    if (!mk || NO_ICON.has(d.type)) return;
+    const src = mk(COL[{ motor_blocks: 'motor', move_blocks: 'move', light_blocks: 'light', sound_blocks: 'sound', event_blocks: 'event', sensor_blocks: 'sensor' }[d.style]][0]);
+    const orig = Blockly.Blocks[d.type].init;
+    Blockly.Blocks[d.type].init = function () {
+      orig.call(this);
+      const inp = this.inputList[0];
+      if (inp) inp.insertFieldAt(0, new Blockly.FieldImage(src, 24, 24, '', null, false));
+    };
+  });
 
   // 內建「如果」積木也歸入控制（橘色）
   const origIf = Blockly.Blocks.controls_if.init;
