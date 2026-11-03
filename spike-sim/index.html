@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SPIKE 模擬器</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/blockly@11.2.1/blockly_compressed.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/blockly@11.2.1/blocks_compressed.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/blockly@11.2.1/javascript_compressed.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/blockly@11.2.1/python_compressed.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/blockly@11.2.1/msg/zh-hant.js"></script>
+</head>
+<body>
+<div id="home">
+  <div class="home-in">
+    <div class="home-brand"><svg viewBox="0 0 32 32" width="44" height="44" aria-hidden="true"><rect x="3" y="3" width="26" height="26" rx="7" fill="#ffd400"/><g fill="#222"><circle cx="11" cy="11" r="2.3"/><circle cx="21" cy="11" r="2.3"/><circle cx="11" cy="21" r="2.3"/><circle cx="21" cy="21" r="2.3"/></g></svg><h1>SPIKE 模擬器</h1></div>
+    <p class="home-sub">用積木寫程式，在模擬場地裡看機器人怎麼動。</p>
+    <h2>開始</h2>
+    <div class="tiles" id="tiles-start"></div>
+    <h2>範例專案</h2>
+    <div class="tiles" id="tiles-sample"></div>
+  </div>
+</div>
+<div id="app">
+  <header class="topbar">
+    <button class="home-btn" id="btn-home" type="button" title="回到首頁" aria-label="回到首頁"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" fill="#3d4357"/></svg></button>
+    <div class="brand" title="SPIKE 模擬器">
+      <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><rect x="3" y="3" width="26" height="26" rx="7" fill="#ffd400"/><g fill="#222"><circle cx="11" cy="11" r="2.3"/><circle cx="21" cy="11" r="2.3"/><circle cx="11" cy="21" r="2.3"/><circle cx="21" cy="21" r="2.3"/></g></svg>
+      <span>SPIKE 模擬器</span>
+    </div>
+    <input id="proj-name" class="proj" value="未命名專案" maxlength="40" aria-label="專案名稱">
+    <div class="seg" id="mode-seg" role="tablist" aria-label="程式模式">
+      <button type="button" data-mode="blocks" class="on">積木</button>
+      <button type="button" data-mode="python">Python</button>
+    </div>
+    <div class="grow"></div>
+    <div class="hubchip"><i></i>主機：模擬中</div>
+    <button class="tbtn" id="btn-new" type="button">新增</button>
+    <button class="tbtn" id="btn-open" type="button">開啟</button>
+    <button class="tbtn" id="btn-save" type="button">儲存</button>
+    <button class="tbtn ghost" id="btn-help" type="button">說明</button>
+    <input type="file" id="file-open" accept=".json,.spike.json,application/json" hidden>
+  </header>
+
+  <div class="body">
+    <section class="coding">
+      <div id="blockly"></div>
+      <div id="pyview" hidden>
+        <div class="pybar">
+          <button class="pill" id="py-regen" type="button">從積木重新產生</button>
+          <button class="pill" id="py-copy" type="button">複製程式碼</button>
+          <span class="muted" id="py-note"></span>
+          <span class="muted pystatus" id="py-status"></span>
+        </div>
+        <div class="pyed"><div id="py-gutter" aria-hidden="true"></div><textarea id="py-src" spellcheck="false" wrap="off" aria-label="Python 程式碼"></textarea></div>
+      </div>
+      <div class="runbar">
+        <button id="btn-run" class="round run" type="button" aria-label="執行程式" title="執行程式"><svg viewBox="0 0 24 24" width="30" height="30"><path d="M8 5v14l11-7z" fill="#fff"/></svg></button>
+        <button id="btn-stop" class="round stop" type="button" aria-label="停止程式" title="停止程式" hidden><svg viewBox="0 0 24 24" width="26" height="26"><rect x="6" y="6" width="12" height="12" rx="2" fill="#fff"/></svg></button>
+      </div>
+    </section>
+
+    <aside class="side">
+      <div class="card stage-card">
+        <div class="card-h">
+          <span class="card-t">模擬場地</span>
+          <label class="sel">場地 <select id="scene"></select></label>
+          <label class="sel">速度 <select id="speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option></select></label>
+        </div>
+        <div class="stagewrap"><canvas id="stage"></canvas><div class="hintline">拖曳機器人或紅色方塊可以移動它們</div></div>
+        <div class="stage-bar">
+          <button class="pill" id="btn-reset" type="button">重設位置</button>
+          <button class="pill" id="btn-rotl" type="button">逆時針 15°</button>
+          <button class="pill" id="btn-rotr" type="button">順時針 15°</button>
+          <label class="chk"><input type="checkbox" id="chk-trail" checked> 軌跡</label>
+          <button class="pill" id="btn-clear" type="button">清除軌跡</button>
+          <label class="chk"><input type="checkbox" id="chk-cone" checked> 感測範圍</label>
+        </div>
+      </div>
+
+      <div class="card hub-card">
+        <div class="card-h"><span class="card-t">主機與裝置</span><span class="muted" id="val-timer"></span></div>
+        <div class="hubgrid">
+          <div class="ports" id="ports-left"></div>
+          <div class="hub">
+            <div class="matrix" id="matrix"></div>
+            <div class="hub-btn"></div>
+            <div class="hub-text" id="hub-text">&nbsp;</div>
+            <div class="yaw" id="val-yaw">轉向角度 0°</div>
+          </div>
+          <div class="ports" id="ports-right"></div>
+        </div>
+      </div>
+
+      <div class="card set-card">
+        <div class="card-h"><span class="card-t">機器人設定</span><span class="muted">依你的車型校正</span></div>
+        <div class="setgrid">
+          <label>輪徑（毫米）<input type="number" id="set-wheel" value="56" min="20" max="120" step="1"></label>
+          <label>輪距（毫米，兩輪中心）<input type="number" id="set-track" value="112" min="60" max="250" step="1"></label>
+          <label>轉向角度方向<select id="set-yaw"><option value="1">順時針為正</option><option value="-1">逆時針為正</option></select></label>
+          <label class="chk wide"><input type="checkbox" id="set-real"> 真實模式（馬達加減速、兩輪 ±1% 誤差）</label>
+        </div>
+      </div>
+
+      <div class="card log-card">
+        <div class="card-h tabsh">
+          <button class="ctab on" id="tab-out" type="button">輸出</button>
+          <button class="ctab" id="tab-err" type="button">報錯台 <span class="badge" id="err-badge" hidden>0</span></button>
+          <span class="grow"></span>
+          <button class="pill small" id="btn-clearlog" type="button">清除</button>
+        </div>
+        <div id="console" aria-live="polite"></div>
+        <div id="errors" hidden></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<dialog id="help">
+  <h2>使用說明</h2>
+  <ul>
+    <li><b>寫程式</b>：從左邊的類別拖積木到中間，接在「當程式開始」下面，按右下角綠色 ▶ 執行。</li>
+    <li><b>機器人</b>：馬達 A 是左輪、馬達 B 是右輪（輪徑 5.6 公分、輪距 11.2 公分）。可以拖曳機器人、旋轉按鈕調整方向，「重設位置」回到起點。</li>
+    <li><b>裝置</b>：C～F 埠可以選顏色、距離或力感測器。積木上的埠要和這裡的設定一致，否則會出現錯誤訊息。預設 C＝顏色、D＝距離、E＝力。</li>
+    <li><b>感測器位置</b>：顏色感測器在機器人前方底部，距離感測器在最前方中央，力感測器是前方的碰撞探針。</li>
+    <li><b>轉向角度</b>：順時針為正，範圍 −180～179。程式一開始會自動歸零。</li>
+    <li><b>事件積木</b>：每一個「當…」積木是一條獨立的程式，會同時執行。</li>
+    <li><b>Python</b>：上方切到「Python」會把積木轉成 SPIKE App 3 風格的 Python，也可以直接改。Python 改過之後不會變回積木。避免寫沒有 <code>await</code> 的無窮迴圈（會讓網頁卡住）。</li>
+    <li><b>報錯台</b>：執行前會先檢查積木（缺條件、埠不符、沒接事件積木），執行時的錯誤會列在這裡，點一下可跳到那個積木或程式行。</li>
+    <li><b>儲存／開啟</b>：存成 .json 檔，也會自動保存在這台電腦的瀏覽器裡。</li>
+  </ul>
+  <form method="dialog"><button class="tbtn">知道了</button></form>
+</dialog>
+
+<script src="sim.js"></script>
+<script src="blocks.js"></script>
+<script src="pygen.js"></script>
+<script src="pyrun.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
