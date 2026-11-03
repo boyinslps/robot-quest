@@ -99,6 +99,10 @@
       this.speedPct = 50; this.msgs = {};
       this.wheelD = WHEEL_D; this.track = TRACK; this.real = false; this.yawSign = 1; this.scaleL = 1; this.scaleR = 1;
       this.ports = { C: 'color', D: 'distance', E: 'force', F: 'none' };
+      this.motorSpeed = { A: 75, B: 75 };   // 官方預設：馬達 75 %、移動 50 %
+      this.cmPerRot = 17.5;                 // 官方預設：1 圈馬達旋轉 = 17.5 公分（可用「設定 1 圈…」校正）
+      this.buttons = { left: 0, right: 0 };  // 主機左右按鈕，按下的毫秒數
+      this.powerColor = -1; this.matrixRot = 0; this.matrixBright = 100;
       this.led = new Array(25).fill(0); this.displayText = '';
       this.loadScene('blank');
       this._last = performance.now();
@@ -276,145 +280,6 @@
   }
   SP.Sim = Sim;
 
-  /* ---------- 給積木程式呼叫的 API ---------- */
-  const PATTERNS = {
-    heart: ['.#.#.', '#####', '#####', '.###.', '..#..'],
-    smile: ['.#.#.', '.....', '#...#', '.###.', '.....'],
-    sad: ['.#.#.', '.....', '.###.', '#...#', '.....'],
-    up: ['..#..', '.###.', '#.#.#', '..#..', '..#..'],
-    check: ['....#', '...#.', '#.#..', '.#...', '.....'],
-    cross: ['#...#', '.#.#.', '..#..', '.#.#.', '#...#'],
-  };
-  SP.createApi = function (sim, io) {
-    const num = (v) => { v = Number(v); return isFinite(v) ? v : 0; };
-    const clamp = (v) => Math.max(-100, Math.min(100, num(v)));
-    const wait = (s) => { const t = sim.simTime + Math.max(0, num(s)); return sim.waitUntil(() => sim.simTime >= t); };
-    let audio = null, seen = {};
-    async function driveDeg(deg, l, r) {
-      deg = Math.abs(num(deg)); const big = Math.max(Math.abs(l), Math.abs(r)); if (!big || !deg) return;
-      const d0 = [sim.mL.deg, sim.mR.deg]; sim.lastMoveT = sim.simTime;
-      await sim.waitUntil(() => {
-        const rem = deg - Math.max(Math.abs(sim.mL.deg - d0[0]), Math.abs(sim.mR.deg - d0[1]));
-        if (rem <= 0.3 || sim.stalled()) return true;
-        const k = Math.min(1, Math.max(0.04, rem * 0.5 / big)); sim.drive(l * k, r * k); return false;
-      });
-      sim.stopAll();
-    }
-    const need = (p, type) => {
-      if (sim.ports[p] !== type) {
-        const nm = { color: '顏色感測器', distance: '距離感測器', force: '力感測器' }[type];
-        throw new Error('埠 ' + p + ' 沒有連接' + nm + '（請到「裝置」確認）');
-      }
-    };
-    return {
-      hl: (id) => io.hl(id),
-      tick: () => sim.waitUntil(() => true),
-      setSpeed(p) { sim.speedPct = Math.max(0, Math.min(100, num(p))); },
-      async move(dir, n, unit) {
-        n = Math.abs(num(n)); const sp = sim.speedPct; if (!sp || !n) return;
-        if (unit === 'sec') { sim.drive(dir * sp, dir * sp); await wait(n); sim.stopAll(); return; }
-        const cm = unit === 'rot' ? n * Math.PI * sim.wheelD : n;
-        const kdeg = 360 / (Math.PI * sim.wheelD), start = (sim.mL.deg + sim.mR.deg) / 2;
-        sim.lastMoveT = sim.simTime;
-        await sim.waitUntil(() => {
-          const rem = cm - dir * ((sim.mL.deg + sim.mR.deg) / 2 - start) / kdeg;
-          if (rem <= 0.02 || sim.stalled()) return true;
-          const s = Math.min(sp, Math.max(4, rem * 12)); sim.drive(dir * s, dir * s); return false;
-        });
-        sim.stopAll();
-      },
-      async turn(dir, deg) {
-        deg = Math.abs(num(deg)); const sp = sim.speedPct; if (!sp || !deg) return;
-        const th0 = sim.th; sim.lastMoveT = sim.simTime;
-        await sim.waitUntil(() => {
-          const rem = deg - dir * (sim.th - th0) * 180 / Math.PI;
-          if (rem <= 0.1 || sim.stalled()) return true;
-          const s = Math.max(3, Math.min(sp, rem * 1.5)); sim.drive(dir * s, -dir * s); return false;
-        });
-        sim.stopAll();
-      },
-      startMove(dir, steer) { this.steer(dir * sim.speedPct, steer); },
-      steer(speed, steer) {
-        const sp = clamp(speed), st = clamp(steer);
-        sim.drive(sp * (st > 0 ? 1 : 1 + st / 50), sp * (st < 0 ? 1 : 1 - st / 50));
-      },
-      stop() { sim.stopAll(); },
-      async motorTurn(port, deg) { return this.motorTurnAt(port, deg, sim.speedPct); },
-      async motorTurnAt(port, deg, sp) {
-        deg = num(deg); sp = Math.abs(num(sp)); const m = port === 'A' ? sim.mL : sim.mR; if (!sp || !deg) return;
-        const d0 = m.deg, dir = Math.sign(deg); sim.lastMoveT = sim.simTime;
-        await sim.waitUntil(() => {
-          const rem = Math.abs(deg) - dir * (m.deg - d0);
-          if (rem <= 0.5 || sim.stalled()) { m.dps = 0; return true; }
-          m.dps = dir * Math.max(8, Math.min(sp, rem * 0.5)) * 10; return false;
-        });
-        m.dps = 0;
-      },
-      // 馬達組：按「馬達轉的度數」或「時間」移動（Python 模式使用）
-      async moveDegrees(deg, steer, pct) {
-        pct = clamp(pct); steer = clamp(steer);
-        return driveDeg(deg, pct * (steer > 0 ? 1 : 1 + steer / 50), pct * (steer < 0 ? 1 : 1 - steer / 50));
-      },
-      async tankDegrees(deg, l, r) { return driveDeg(deg, clamp(l), clamp(r)); },
-      async moveTime(ms, steer, pct) {
-        pct = clamp(pct); steer = clamp(steer);
-        sim.drive(pct * (steer > 0 ? 1 : 1 + steer / 50), pct * (steer < 0 ? 1 : 1 - steer / 50));
-        await wait(num(ms) / 1000); sim.stopAll();
-      },
-      tank(l, r) { sim.drive(clamp(l), clamp(r)); },
-      motorSetPos(p, v) { (p === 'A' ? sim.mL : sim.mR).deg = num(v); },
-      distMm: (p) => { need(p, 'distance'); return sim.distanceMm(); },
-      colorKey: (p) => { need(p, 'color'); return sim.color(); },
-      yawDeci: () => Math.round(-((sim.th - sim.yawOff) * 1800 / Math.PI)),
-      motorVel: (p) => Math.round((p === 'A' ? sim.mL : sim.mR).cur || 0),
-      ticksMs: () => Math.round(sim.simTime * 1000),
-      stopSim() { sim.abort(); },
-      motorStart(port, p) { const v = clamp(p) * 10; if (port === 'A' || port === 'AB') sim.mL.dps = v; if (port === 'B' || port === 'AB') sim.mR.dps = v; },
-      wait,
-      waitUntil: (fn) => sim.waitUntil(fn),
-      colorIs: (p, c) => { need(p, 'color'); return sim.color() === c; },
-      light: (p) => { need(p, 'color'); return sim.light(); },
-      dist: (p) => { need(p, 'distance'); return sim.distance(); },
-      distLess: (p, op, n) => { need(p, 'distance'); const d = sim.distance(); return op === '<' ? d < num(n) : d > num(n); },
-      pressed: (p) => { need(p, 'force'); return sim.pressed(); },
-      yaw: () => sim.yaw(),
-      resetYaw() { sim.yawOff = sim.th; },
-      timer: () => sim.timer(),
-      resetTimer() { sim.timerOff = sim.simTime; },
-      motorPos: (p) => Math.round(p === 'A' ? sim.mL.deg : sim.mR.deg),
-      motorStop(p) { if (p === 'A' || p === 'AB') sim.mL.dps = 0; if (p === 'B' || p === 'AB') sim.mR.dps = 0; },
-      say: (t) => io.say(t),
-      broadcast(m) { sim.msgs[m] = (sim.msgs[m] || 0) + 1; },
-      resetRun() { sim.msgs = {}; seen = {}; sim.aborted = false; },
-      async waitMsg(m, who) {
-        const k = who + '|' + m;
-        await sim.waitUntil(() => (sim.msgs[m] || 0) > (seen[k] || 0));
-        seen[k] = (seen[k] || 0) + 1;
-      },
-      stopProgram() { sim.abort(); throw STOP; },
-      lightText(t) { sim.displayText = String(t); sim.led.fill(0); io.say('[螢幕] ' + t); },
-      lightPattern(name) {
-        const rows = PATTERNS[name] || PATTERNS.heart;
-        sim.led = rows.join('').split('').map((c) => (c === '#' ? 100 : 0)); sim.displayText = '';
-      },
-      lightPixel(x, y, b) {
-        x = Math.round(num(x)); y = Math.round(num(y));
-        if (x < 1 || x > 5 || y < 1 || y > 5) return;
-        sim.led[(y - 1) * 5 + (x - 1)] = Math.max(0, Math.min(100, num(b)));
-      },
-      lightOff() { sim.led.fill(0); sim.displayText = ''; },
-      async beep(note, s) { return this.beepHz(440 * Math.pow(2, (num(note) - 69) / 12), s); },
-      async beepHz(f, s) {
-        try {
-          audio = audio || new (window.AudioContext || window.webkitAudioContext)();
-          const o = audio.createOscillator(), gn = audio.createGain();
-          o.frequency.value = Math.max(100, Math.min(4000, num(f))); gn.gain.value = 0.08;
-          o.connect(gn); gn.connect(audio.destination); o.start();
-          o.stop(audio.currentTime + Math.max(0.05, num(s)) / sim.mul);
-        } catch (e) { /* 沒有音訊也沒關係 */ }
-        await wait(s);
-      },
-    };
-  };
   SP.STOP = STOP;
+  SP.WHEEL_D = WHEEL_D; SP.TRACK = TRACK;
 })(window.SP = window.SP || {});

@@ -19,6 +19,11 @@
     const t = el.getAttribute && el.getAttribute('type');
     return !['procedures_defreturn', 'procedures_ifreturn', 'procedures_callreturn'].includes(t);
   }));
+  ws.registerToolboxCategoryCallback('VARIABLE', (w) => {
+    const list = Blockly.Variables.flyoutCategory(w);
+    list.push(Blockly.utils.xml.textToDom('<block type="math_change"><value name="DELTA"><shadow type="math_number"><field name="NUM">1</field></shadow></value></block>'));
+    return list;
+  });
   const sim = new SP.Sim($('stage'));
 
   /* ---------- 訊息欄 ---------- */
@@ -80,6 +85,7 @@
   ['A', 'C', 'E'].forEach((p) => buildPort(p, 'ports-left'));
   ['B', 'D', 'F'].forEach((p) => buildPort(p, 'ports-right'));
   const cells = []; for (let i = 0; i < 25; i++) { const c = document.createElement('i'); $('matrix').appendChild(c); cells.push(c); }
+  const POWER_CSS = { 0: '#222', 1: '#ff2bd0', 2: '#8a2be2', 3: '#2a62ff', 4: '#40c0ff', 5: '#20e0c0', 6: '#22c55e', 7: '#ffd400', 8: '#ff8c1a', 9: '#ff2d2d', 10: '#fff' };
   const CN = { black: '黑色', white: '白色', red: '紅色', yellow: '黃色', green: '綠色', blue: '藍色', none: '無' };
   function refreshHub() {
     portEl.A.textContent = Math.round(sim.mL.deg) + '°'; portEl.B.textContent = Math.round(sim.mR.deg) + '°';
@@ -88,12 +94,24 @@
       portEl[p].textContent = t === 'color' ? CN[sim.color()] + '／反射光 ' + sim.light() + '%'
         : t === 'distance' ? sim.distance() + ' 公分' : t === 'force' ? (sim.pressed() ? '被按下' : '未按下') : '';
     }
-    sim.led.forEach((b, i) => { cells[i].style.background = b ? `rgb(${60 + b * 1.9},${60 + b * 1.7},${70 + b * 0.2})` : ''; });
+    const r = sim.matrixRot;
+    for (let cy = 0; cy < 5; cy++) for (let cx = 0; cx < 5; cx++) {
+      const [sx, sy] = r === 0 ? [cx, cy] : r === 1 ? [cy, 4 - cx] : r === 2 ? [4 - cx, 4 - cy] : [4 - cy, cx];
+      const b = sim.led[sy * 5 + sx];
+      cells[cy * 5 + cx].style.background = b ? `rgb(${60 + b * 1.9},${60 + b * 1.7},${70 + b * 0.2})` : '';
+    }
+    $('hub-power').style.background = POWER_CSS[sim.powerColor] || '#fff';
     $('hub-text').textContent = sim.displayText || ' ';
     $('val-yaw').textContent = '轉向角度 ' + sim.yaw() + '°';
     $('val-timer').textContent = '計時器 ' + sim.timer().toFixed(1) + ' 秒';
   }
   setInterval(refreshHub, 100);
+  for (const side of ['left', 'right']) {      // 主機的左右按鈕：按住就是按下
+    const el = $('btn-hub-' + side);
+    el.addEventListener('pointerdown', (e) => { sim.buttons[side] = performance.now(); el.setPointerCapture(e.pointerId); el.classList.add('down'); });
+    const up = () => { sim.buttons[side] = 0; el.classList.remove('down'); };
+    el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up); el.addEventListener('lostpointercapture', up);
+  }
 
   /* ---------- 執行 ---------- */
   let lastBlock = null;
@@ -101,6 +119,12 @@
   const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
   let running = false;
   function setRunning(r) { running = r; $('btn-run').hidden = r; $('btn-stop').hidden = !r; }
+  function resetHubState() {      // 程式一開始：回到官方預設值
+    api.resetRun(); sim.yawOff = sim.th; sim.timerOff = sim.simTime; sim.lastMoveT = sim.simTime;
+    sim.speedPct = 50; sim.motorSpeed = { A: 75, B: 75 }; sim.cmPerRot = 17.5;
+    sim.mL.rel0 = sim.mL.deg; sim.mR.rel0 = sim.mR.deg;      // 相對位置：程式開始後轉了幾度
+    sim.matrixBright = 100; sim.matrixRot = 0; sim.powerColor = -1; sim.led.fill(0); sim.displayText = '';
+  }
   async function runProgram() {
     if (running) return;
     clearErrors(); $('console').textContent = '';
@@ -112,8 +136,8 @@
     let gen;
     try { gen = SP.generate(ws); } catch (e) { addError({ level: 'error', msg: '積木轉換失敗：' + e.message }); showTab('err'); return; }
     setRunning(true); lastBlock = null;
-    api.resetRun(); sim.yawOff = sim.th; sim.timerOff = sim.simTime; sim.speedPct = 50; sim.lastMoveT = sim.simTime;
-    try { await new AsyncFunction('api', gen.code)(api); }
+    resetHubState();
+    try { await new AsyncFunction('__api', gen.code)(api); }
     catch (e) {
       if (e !== SP.STOP) {
         const msg = e && e.message ? e.message : String(e);
@@ -127,7 +151,7 @@
     const code = $('py-src').value;
     if (!code.trim()) { addError({ level: 'error', msg: 'Python 程式是空的。可以按「從積木重新產生」，或直接輸入程式。' }); showTab('err'); return; }
     setRunning(true); markPyLine(null);
-    api.resetRun(); sim.yawOff = sim.th; sim.timerOff = sim.simTime; sim.speedPct = 50; sim.lastMoveT = sim.simTime;
+    resetHubState();
     try {
       const r = await SP.py.run(code, api, sim, { say, warn: (m, line) => { addError({ level: 'warn', msg: m, line }); }, status: (t) => { $('py-status').textContent = t; } });
       if (r.error) {
@@ -157,7 +181,12 @@
 
   /* ---------- 報錯台 ---------- */
   const errs = [];
-  const SENSOR_TYPE = { sp_color_is: 'color', sp_light: 'color', sp_when_color: 'color', sp_dist: 'distance', sp_dist_less: 'distance', sp_when_dist: 'distance', sp_force: 'force', sp_when_force: 'force' };
+  const SENSOR_TYPE = {
+    sp_color_is: 'color', sp_color: 'color', sp_reflect_is: 'color', sp_light: 'color', sp_when_color: 'color',
+    sp_dist: 'distance', sp_dist_is: 'distance', sp_dist_less: 'distance', sp_when_dist: 'distance',
+    sp_force: 'force', sp_pressed_is: 'force', sp_force_val: 'force', sp_when_force: 'force',
+  };
+  const MOTOR_TYPES = new Set(['sp_motor_run', 'sp_motor_goto', 'sp_motor_start', 'sp_motor_stop', 'sp_motor_speed_set', 'sp_motor_pos', 'sp_motor_speed', 'sp_motor_relpos', 'sp_motor_setrel', 'sp_motor_turn']);
   const SENSOR_NAME = { color: '顏色感測器', distance: '距離感測器', force: '力感測器' };
   const isHat = (b) => b.type === 'sp_start' || b.type.startsWith('sp_when_');
   function showTab(t) {
@@ -200,6 +229,7 @@
     tops.forEach((b) => { if (!isHat(b) && b.type !== 'procedures_defnoreturn' && !b.isShadow()) out.push({ level: 'warn', msg: '這個積木沒有接在事件積木下面，不會被執行。', blockId: b.id }); });
     ws.getAllBlocks(false).forEach((b) => {
       const need = SENSOR_TYPE[b.type], p = need && b.getFieldValue('PORT');
+      if (MOTOR_TYPES.has(b.type) && !['A', 'B'].includes(b.getFieldValue('PORT'))) out.push({ level: 'error', msg: '埠 ' + b.getFieldValue('PORT') + ' 沒有馬達（模擬器：A＝左輪、B＝右輪）。', blockId: b.id });
       if (need && sim.ports[p] !== need) out.push({ level: 'error', msg: '埠 ' + p + ' 沒有連接' + SENSOR_NAME[need] + '（請到「主機與裝置」設定）。', blockId: b.id });
       b.inputList.forEach((inp) => {
         const c = inp.connection;
