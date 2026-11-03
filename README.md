@@ -76,36 +76,6 @@ private/            老師專用、不公開（.gitignore）：參考解、關�
 lego quest/         Lego Quest 的規格書、原始 PDF 與壓縮檔（原始素材，不進 git）
 ```
 
-## SPIKE 模擬器（`spike-sim/`）
-
-仿 Open Roberta 的 EV3 線上模擬方式，做給 LEGO SPIKE 用的積木編輯器＋機器人模擬場地，介面為繁體中文並仿 SPIKE App 的編輯畫面。直接用 Chrome 開 `spike-sim/index.html`（需要網路載入 Blockly）。
-
-- 左側彩色圓形類別列（動作、燈光、聲音、事件、控制、感測、運算、變數）、Scratch 風格積木、右下角綠色執行鈕。
-- 右側：模擬場地（6 種：空白、尺規、循線、顏色區、迷宮、可拖曳障礙物）、主機（5×5 燈光矩陣）與 A～F 埠裝置（C～F 可選顏色／距離／力感測器）、訊息欄。
-- 物理：輪徑 5.6 cm、輪距 11.2 cm、3 px = 1 cm；距離感測器用 5 條射線偵測；顏色感測器讀場地底圖像素；轉向角度順時針為正。
-- 每個「當…」積木是獨立執行緒，可同時執行；有我的積木、傳送／接收訊息、計時器事件；支援儲存／開啟 .json 與自動保存。
-- **積木 ↔ Python 切換**：上方「積木／Python」切換；積木會轉成 SPIKE App 3 風格的 Python（`hub`、`motor_pair`、`color_sensor`、`runloop`…），Python 可直接修改並在模擬器執行（Pyodide，第一次載入約 10 MB，需要網路）。Python 改過後不會變回積木。
-- **報錯台**：執行前檢查積木（沒有事件積木、埠不符、缺條件、孤立積木），執行時的錯誤（含 Python 錯誤，翻成中文並標出第幾行）會列在報錯台，點一下跳到積木或程式行。
-- 首頁（新專案、繼續、開啟檔案、4 個範例專案）；「機器人設定」可校正輪徑、輪距、轉向角度方向，並可開啟「真實模式」（馬達加減速、兩輪 ±1% 誤差）。
-
-| 檔案 | 用途 |
-|---|---|
-| `spike-sim/sim.js` | 物理、感測器、場景、積木呼叫的 API |
-| `spike-sim/blocks.js` | 積木定義、JavaScript 程式產生器、工具箱、配色與圖示 |
-| `spike-sim/pygen.js` | 積木 → Python 產生器 |
-| `spike-sim/pyrun.js` | Pyodide 執行環境與 SPIKE Python API 子集、Python 錯誤解析 |
-| `spike-sim/app.js`、`style.css`、`index.html` | 介面與執行流程 |
-
-### 給學生使用（線上網址）
-
-`.github/workflows/pages.yml` 會把 `spike-sim/` 部署到 GitHub Pages，學生只要開網址就能用，不用安裝任何東西。
-
-1. 把這個分支合併到 `main`（之後每次 `spike-sim/` 有更新，推到 `main` 會自動重新部署）。
-2. 到 GitHub 倉庫的 **Settings → Pages**，把 **Source** 選成 **GitHub Actions**（只需要設定一次）。
-3. 到 **Actions** 頁面確認「部署 SPIKE 模擬器」成功，網址會顯示在那裡，通常是 `https://<帳號>.github.io/robot-quest/`。
-
-學生的電腦要能連到 `cdn.jsdelivr.net`（載入 Blockly 與 Python 執行環境）。學校網路若擋這個網站，積木模式和 Python 模式都會打不開。
-
 ## Lego Quest（實體積木組裝）
 
 選拔共三關：**組裝（Lego Quest）→ 程式（Robot Quest）→ 面試**。學生拿到一袋真的樂高積木，照網站上的官方說明書把**吉他**拼出來；網站負責清點、計時、翻說明書、記錄，**作品對不對由老師現場檢查**，在後台勾選等級。
