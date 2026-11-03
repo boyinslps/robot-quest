@@ -9,11 +9,11 @@
 
 ### 給學生使用（線上網址）
 
-`.github/workflows/pages.yml` 會把 `spike-sim/` 部署到 GitHub Pages（只部署這個資料夾，不含篩選測驗與教師後台）。
+倉庫已經用 GitHub Pages 發佈，所以**合併到 `main` 後不用另外設定**，模擬器會自動出現在子路徑：
 
-1. 把程式合併到 `main`（之後只有 `spike-sim/` 更新才會重新部署）。
-2. 到倉庫 **Settings → Pages**，把 **Source** 選成 **GitHub Actions**（只需設定一次）。
-3. 到 **Actions** 確認「部署 SPIKE 模擬器」成功，網址通常是 `https://<帳號>.github.io/robot-quest/`。
+> `https://boyinslps.github.io/robot-quest/spike-sim/`
+
+根網址 `https://boyinslps.github.io/robot-quest/` 仍然是篩選測驗，兩者互不影響。第一次發佈要等 1～2 分鐘；之後 `spike-sim/` 有更新、合併到 `main` 就會自動更新。
 
 學校網路若擋 `cdn.jsdelivr.net`，積木與 Python 模式都會打不開。
 
