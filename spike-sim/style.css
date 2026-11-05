@@ -153,3 +153,38 @@ dialog li { margin: 6px 0; line-height: 1.55; }
 .hbtn { width: 34px; height: 24px; border: 2px solid #c9cfdb; background: #fff; border-radius: 8px; font: 800 11px var(--font); color: var(--muted); cursor: pointer; touch-action: none; }
 .hbtn.down { background: #cfd6e6; transform: translateY(1px); }
 .hub-btn { transition: background .1s; }
+
+/* 場地／3D 分頁、布置場地、全螢幕 */
+.vtabs { display: flex; background: #eef1f6; border-radius: 999px; padding: 3px; }
+.vtabs button { border: 0; background: transparent; font: 800 13px var(--font); color: var(--muted); padding: 5px 14px; border-radius: 999px; cursor: pointer; }
+.vtabs button.on { background: #fff; color: var(--blue); box-shadow: 0 1px 4px rgba(0,0,0,.15); }
+.card-h .grow { flex: 1; }
+.pill[aria-pressed="true"] { background: var(--blue); color: #fff; border-color: var(--blue); }
+.pill.hold:active, .pill.hold.down { background: #d9534f; color: #fff; border-color: #d9534f; }
+
+.editbar { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; background: #f3f7ff; border: 1px solid #cfe0ff; border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; }
+.tools { display: flex; gap: 4px; flex-wrap: wrap; }
+.tool { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 5px 11px; font: 800 12px var(--font); color: var(--ink); cursor: pointer; }
+.tool.on { background: var(--blue); color: #fff; border-color: var(--blue); }
+.props { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding-top: 6px; border-top: 1px dashed #cfe0ff; }
+.props label { font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 4px; color: var(--ink); }
+.props input[type=number] { width: 62px; font: 700 12px var(--font); border: 1px solid var(--line); border-radius: 6px; padding: 3px 5px; }
+
+#stage.editing { cursor: crosshair; }
+.view3d { position: relative; width: 100%; aspect-ratio: 3 / 2; border-radius: 8px; overflow: hidden; border: 1px solid var(--line); background: #e9edf3; }
+#three-host { position: absolute; inset: 0; }
+.v3bar { position: absolute; left: 8px; right: 8px; bottom: 8px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.v3bar .muted { background: rgba(255,255,255,.8); border-radius: 6px; padding: 2px 8px; margin-right: auto; }
+.v3note { position: absolute; left: 8px; top: 8px; font-size: 11px; color: #555; background: rgba(255,255,255,.8); padding: 2px 8px; border-radius: 6px; max-width: 70%; }
+.fs-runbar { display: none; align-items: center; gap: 12px; margin-top: 10px; }
+.fsbtn { border: 0; border-radius: 12px; padding: 12px 26px; font: 800 18px var(--font); color: #fff; cursor: pointer; }
+.fsbtn.run { background: var(--green); }
+.fsbtn.stop { background: var(--red); }
+.fs-info { font: 700 15px var(--font); color: var(--ink); }
+
+#stage-card:fullscreen { display: flex; flex-direction: column; background: var(--bg); padding: 16px; border-radius: 0; border: 0; width: 100vw; height: 100vh; overflow: auto; }
+#stage-card:fullscreen .stagewrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; background: #dfe3ea; }
+#stage-card:fullscreen #stage { height: 100%; width: auto; max-width: 100%; aspect-ratio: 3 / 2; object-fit: contain; }
+#stage-card:fullscreen .view3d { flex: 1; aspect-ratio: auto; min-height: 0; }
+#stage-card:fullscreen .fs-runbar { display: flex; }
+#stage-card:fullscreen .card-h { font-size: 16px; }
