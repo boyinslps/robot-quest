@@ -54,6 +54,24 @@
   SP.SCENES = SCENES;
 
   /* ---------- 工具 ---------- */
+  // 旋轉後的矩形（中心 cx,cy、半寬 hx、半長 hy、順時針轉 th）是否與軸對齊矩形 r 相交（分離軸；剛好貼著不算相交）
+  function obbHitsRect(cx, cy, th, hx, hy, r) {
+    const c = Math.cos(th), s = Math.sin(th), ac = Math.abs(c), as = Math.abs(s);
+    const rw = r.w / 2, rh = r.h / 2, dx = cx - (r.x + rw), dy = cy - (r.y + rh);
+    if (Math.abs(dx) >= rw + ac * hx + as * hy) return false;
+    if (Math.abs(dy) >= rh + as * hx + ac * hy) return false;
+    if (Math.abs(dx * c + dy * s) >= hx + rw * ac + rh * as) return false;
+    if (Math.abs(-dx * s + dy * c) >= hy + rw * as + rh * ac) return false;
+    return true;
+  }
+  function obbOutside(cx, cy, th, hx, hy) {
+    const c = Math.cos(th), s = Math.sin(th);
+    for (const [lx, ly] of [[-hx, -hy], [hx, -hy], [hx, hy], [-hx, hy]]) {
+      const px = cx + lx * c - ly * s, py = cy + lx * s + ly * c;
+      if (px < 0 || px > W || py < 0 || py > H) return true;
+    }
+    return false;
+  }
   function rayRect(ox, oy, dx, dy, r) {
     let tmin = 0, tmax = Infinity;
     const ax = [[ox, dx, r.x, r.x + r.w], [oy, dy, r.y, r.y + r.h]];
@@ -131,11 +149,12 @@
       }
       g.restore();
       this.bgData = g.getImageData(0, 0, this.bg.width, this.bg.height);
+      this.bgVersion = (this.bgVersion || 0) + 1;       // 3D 用來知道地板圖案變了
     }
     resetPose() {
       const s = this.start;
       this.rects.forEach((r) => { if (r.ox !== undefined) { r.x = r.ox; r.y = r.oy; } });
-      this.x = s.x; this.y = s.y; this.th = rad(s.a);
+      this.x = s.x; this.y = s.y; this.th = rad(s.a); this.nudgeFree();
       this.mL.dps = this.mR.dps = 0; this.mL.cur = this.mR.cur = 0;
       this.rollError();
       this.yawOff = this.th; this.lastMoveT = this.simTime;
@@ -198,22 +217,16 @@
       const r = () => (this.real ? 1 + (Math.random() - 0.5) * 0.02 : 1);
       this.scaleL = r(); this.scaleR = r();
     }
-    clearTrail() { this.trail.getContext('2d').clearRect(0, 0, this.trail.width, this.trail.height); }
+    clearTrail() { this.trail.getContext('2d').clearRect(0, 0, this.trail.width, this.trail.height); this.trailVersion = (this.trailVersion || 0) + 1; }
     rotateBy(deg) { this.th += rad(deg); this.lastMoveT = this.simTime; }
 
     /* --- 驅動 --- */
     drive(l, r) { this.mL.dps = l * 10; this.mR.dps = r * 10; }
     stopAll() { this.mL.dps = 0; this.mR.dps = 0; }
     rectHits(x, y, th) {
-      const c = Math.cos(th), s = Math.sin(th), pts = [];
-      for (let i = 0; i <= 6; i++) for (const lx of [-HW, HW]) pts.push([lx, -HL + (2 * HL * i) / 6]);
-      for (let j = 1; j < 4; j++) for (const ly of [-HL, HL]) pts.push([-HW + (2 * HW * j) / 4, ly]);
-      let fixed = false; const push = new Set();
-      for (const [lx, ly] of pts) {
-        const px = x + lx * c - ly * s, py = y + lx * s + ly * c;
-        if (px < 0 || px > W || py < 0 || py > H) fixed = true;
-        for (const r of this.rects) if (px > r.x && px < r.x + r.w && py > r.y && py < r.y + r.h) { if (r.push) push.add(r); else fixed = true; }
-      }
+      const fixed0 = obbOutside(x, y, th, HW, HL);
+      let fixed = fixed0; const push = new Set();
+      for (const r of this.rects) if (obbHitsRect(x, y, th, HW, HL, r)) { if (r.push) push.add(r); else fixed = true; }
       return { fixed, push };
     }
     collides(x, y, th) { const c = this.rectHits(x, y, th); return c.fixed || c.push.size > 0; }
@@ -221,6 +234,30 @@
       if (px < 0 || px > W || py < 0 || py > H) return true;
       for (const r of this.rects) if (px > r.x && px < r.x + r.w && py > r.y && py < r.y + r.h) return true;
       return false;
+    }
+    /* 一個矩形（候選的障礙物）會不會壓到機器人 */
+    overlapsRobot(r) { return obbHitsRect(this.x, this.y, this.th, HW, HL, r); }
+    /* 拖曳機器人：沿著路徑一公分一公分走，碰到障礙物就停在前一格，不會穿過牆 */
+    dragRobotTo(tx, ty) {
+      tx = Math.max(8, Math.min(W - 8, tx)); ty = Math.max(8, Math.min(H - 8, ty));
+      const dx = tx - this.x, dy = ty - this.y, n = Math.max(1, Math.ceil(Math.hypot(dx, dy)));
+      const wasIn = this.collides(this.x, this.y, this.th);
+      for (let i = 1; i <= n; i++) {
+        const nx = this.x + dx / n, ny = this.y + dy / n;
+        if (this.collides(nx, ny, this.th) && !wasIn) break;
+        this.x = nx; this.y = ny;
+      }
+      this.lastMoveT = this.simTime;
+    }
+    /* 起點被障礙物蓋住時，找最近的空位 */
+    nudgeFree() {
+      if (!this.collides(this.x, this.y, this.th)) return;
+      for (let rad = 1; rad <= 120; rad++) {
+        for (let a = 0; a < 360; a += 10) {
+          const nx = this.x + rad * Math.cos(a * Math.PI / 180), ny = this.y + rad * Math.sin(a * Math.PI / 180);
+          if (!this.collides(nx, ny, this.th)) { this.x = nx; this.y = ny; return; }
+        }
+      }
     }
     rectFree(n, skip) {
       if (n.x < 0 || n.y < 0 || n.x + n.w > W || n.y + n.h > H) return false;
@@ -264,6 +301,7 @@
           const t = this.trail.getContext('2d');
           t.save(); t.scale(PX, PX); t.strokeStyle = 'rgba(224,165,38,.85)'; t.lineWidth = 0.8; t.lineCap = 'round';
           t.beginPath(); t.moveTo(this.x, this.y); t.lineTo(nx, ny); t.stroke(); t.restore();
+          this.trailVersion = (this.trailVersion || 0) + 1;
         }
       }
       this.x = nx; this.y = ny; this.th = nth; this.simTime += DT;
@@ -324,8 +362,9 @@
     }
     pressed() {
       if (this.handPress) return true;
-      for (const lx of [-3, 0, 3]) { const [px, py] = this.local(lx, -(HL + 1)); if (this.hit(px, py)) return true; }
-      return false;
+      const [cx, cy] = this.local(0, -(HL + 0.75));
+      if (obbOutside(cx, cy, this.th, 3.5, 0.75)) return true;
+      return this.rects.some((r) => obbHitsRect(cx, cy, this.th, 3.5, 0.75, r));
     }
     yaw() { let d = Math.round(this.yawSign * (this.th - this.yawOff) * 180 / Math.PI); d = ((d + 180) % 360 + 360) % 360 - 180; return d; }
     timer() { return Math.round((this.simTime - this.timerOff) * 10) / 10; }

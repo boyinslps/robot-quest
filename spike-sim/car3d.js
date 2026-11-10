@@ -1,4 +1,5 @@
-/* SPIKE 小車 3D 預覽（Three.js）：可旋轉、縮放；輪子、燈陣、電源鍵燈、顏色感測器燈跟著模擬器動。
+/* SPIKE 小車 3D 預覽（Three.js）：顯示整個場地（地板圖案、牆、方塊、色紙、膠帶、軌跡）和小車的實際位置與方向；
+   可旋轉、縮放；輪子、燈陣、電源鍵燈、顏色感測器燈跟著模擬器動；鏡頭可「跟隨小車」或看「場地全景」。
    模型是依模擬器的尺寸（輪徑 5.6 公分、輪距 11.2 公分）簡化的示意模型，不是官方三視圖或官方 3D 檔。
    座標單位：公分；車頭朝 -Z，右邊是 +X，上方是 +Y。 */
 import * as THREE from 'three';
@@ -9,7 +10,10 @@ const POWER = { 0: '#222222', 1: '#ff2bd0', 2: '#8a2be2', 3: '#2a62ff', 4: '#40c
 const COLOR_HEX = { red: '#d93025', yellow: '#f2c400', green: '#1e9e4a', blue: '#1a60d6', white: '#ffffff', black: '#111111', none: '#9aa0a6' };
 
 let renderer, scene, camera, controls, host, raf = 0, ready = false;
-let wheelL, wheelR, floorTex, ledCtx, ledTex, powerMat, colorLedMat, btnL, btnR, hubGroup;
+let wheelL, wheelR, rig, ledCtx, ledTex, powerMat, colorLedMat, btnL, btnR, hubGroup;
+let floorTex, trailTex, bgVer = -1, trailVer = -1, trailAt = 0;
+const rectMeshes = new Map();
+let mode = 'follow', lastPos = null;
 let lastW = 0, lastH = 0;
 
 const mat = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.55, metalness: 0.05, ...o });
@@ -42,23 +46,30 @@ function matrixTexture() {
 function build() {
   scene = new THREE.Scene();
   scene.background = new THREE.Color('#e9edf3');
-  scene.fog = new THREE.Fog('#e9edf3', 90, 220);
-  camera = new THREE.PerspectiveCamera(40, 1, 0.5, 400);
+  camera = new THREE.PerspectiveCamera(40, 1, 0.5, 1600);
   scene.add(new THREE.HemisphereLight('#ffffff', '#9aa3b5', 0.95));
-  const sun = new THREE.DirectionalLight('#ffffff', 1.25);
-  sun.position.set(24, 40, -18); sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024);
-  Object.assign(sun.shadow.camera, { left: -30, right: 30, top: 30, bottom: -30, near: 5, far: 120 }); scene.add(sun);
+  const sun = new THREE.DirectionalLight('#ffffff', 1.2);
+  sun.position.set(90, 170, -70); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -190, right: 190, top: 130, bottom: -130, near: 20, far: 500 }); scene.add(sun);
 
-  // 地板：10 公分一格，隨車子走過的距離往後捲動
-  const fc = document.createElement('canvas'); fc.width = fc.height = 256;
-  const f = fc.getContext('2d'); f.fillStyle = '#f7f6ef'; f.fillRect(0, 0, 256, 256);
-  f.strokeStyle = '#d4d1c4'; f.lineWidth = 3; f.strokeRect(0, 0, 256, 256);
-  f.lineWidth = 1; f.beginPath(); f.moveTo(128, 0); f.lineTo(128, 256); f.moveTo(0, 128); f.lineTo(256, 128); f.stroke();
-  floorTex = new THREE.CanvasTexture(fc); floorTex.wrapS = floorTex.wrapT = THREE.RepeatWrapping; floorTex.repeat.set(20, 20); floorTex.colorSpace = THREE.SRGBColorSpace;
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ map: floorTex, roughness: 1 }));
+  // 地板：直接用模擬器的底圖（場景圖案 + 你貼的色紙、膠帶）；上面再疊一層軌跡
+  floorTex = new THREE.CanvasTexture(SP.sim.bg); floorTex.colorSpace = THREE.SRGBColorSpace; floorTex.anisotropy = 4;
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(300, 200), new THREE.MeshStandardMaterial({ map: floorTex, roughness: 1 }));
   floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+  trailTex = new THREE.CanvasTexture(SP.sim.trail); trailTex.colorSpace = THREE.SRGBColorSpace;
+  const trail = new THREE.Mesh(new THREE.PlaneGeometry(300, 200), new THREE.MeshBasicMaterial({ map: trailTex, transparent: true, depthWrite: false }));
+  trail.rotation.x = -Math.PI / 2; trail.position.y = 0.04; scene.add(trail);
+  // 場地外圍的牆（碰撞邊界）
+  const border = new THREE.MeshStandardMaterial({ color: '#4b4f57', roughness: 0.8 });
+  for (const [w, d, x, z] of [[304, 2, 0, -101], [304, 2, 0, 101], [2, 204, -151, 0], [2, 204, 151, 0]]) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, 6, d), border); m.position.set(x, 3, z); m.castShadow = true; m.receiveShadow = true; scene.add(m);
+  }
+  // 地板外面的大地面
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(1600, 1600), new THREE.MeshStandardMaterial({ color: '#d5dae3', roughness: 1 }));
+  ground.rotation.x = -Math.PI / 2; ground.position.y = -0.1; ground.receiveShadow = true; scene.add(ground);
 
-  const car = new THREE.Group(); scene.add(car);
+  rig = new THREE.Group(); scene.add(rig);
+  const car = new THREE.Group(); rig.add(car);
   const YEL = '#f2c400', WHITE = '#f3f3f0', GRAY = '#7d848d', DARK = '#26282c';
 
   // 主機（黃色）：5×5 燈陣、左右按鈕、電源鍵
@@ -103,17 +114,44 @@ function build() {
   add(car, new THREE.Mesh(new THREE.BoxGeometry(1.0, 2.4, 0.8), mat(GRAY)), 0, 3.1, -5.9);   // 連接片
 
   controls = new OrbitControls(camera, renderer.domElement);
-  Object.assign(controls, { enableDamping: true, dampingFactor: 0.08, minDistance: 12, maxDistance: 90, maxPolarAngle: Math.PI / 2 - 0.02, enablePan: true, screenSpacePanning: true });
-  controls.target.set(0, 3.2, 0);
+  Object.assign(controls, { enableDamping: true, dampingFactor: 0.08, minDistance: 12, maxDistance: 520, maxPolarAngle: Math.PI / 2 - 0.02, enablePan: true, screenSpacePanning: true });
   setView('iso');
 }
 
+// 視角（跟隨小車：相對小車；場地全景：相對場地中心）
 const VIEWS = {
-  iso: [26, 20, -30], front: [0, 6, -42], back: [0, 6, 42], right: [42, 6, 0], left: [-42, 6, 0], top: [0, 58, 0.01],
+  follow: { iso: [26, 20, -30], front: [0, 6, -42], back: [0, 6, 42], right: [42, 6, 0], left: [-42, 6, 0], top: [0, 58, 0.01] },
+  arena: { iso: [0, 210, 250], front: [0, 80, -340], back: [0, 80, 340], right: [380, 80, 0], left: [-380, 80, 0], top: [0, 380, 0.01] },
 };
+function robotPos() { const s = SP.sim; return new THREE.Vector3(s.x - 150, 0, s.y - 100); }
 function setView(name) {
-  const v = VIEWS[name] || VIEWS.iso; camera.position.set(...v);
-  controls.target.set(0, name === 'top' ? 0 : 3.2, 0); controls.update();
+  const v = (VIEWS[mode][name] || VIEWS[mode].iso).slice();
+  if (mode === 'follow') {
+    const yaw = -SP.sim.th, cy = Math.cos(yaw), sy = Math.sin(yaw), p = robotPos();   // 正視／側視是相對車頭，所以跟著車子的方向轉
+    camera.position.set(p.x + v[0] * cy + v[2] * sy, v[1], p.z - v[0] * sy + v[2] * cy);
+    controls.target.set(p.x, name === 'top' ? 0 : 3.2, p.z); lastPos = p;
+  } else { camera.position.set(...v); controls.target.set(0, 0, 0); lastPos = null; }
+  controls.update();
+}
+function setMode(m) { mode = m === 'arena' ? 'arena' : 'follow'; setView('iso'); }
+
+// 場地上的牆與方塊：每個障礙物一個 3D 方塊，位置跟著模擬器（被推動也會動）
+function syncRects() {
+  const sim = SP.sim, live = new Set(sim.rects);
+  for (const [r, m] of rectMeshes) if (!live.has(r)) { scene.remove(m); m.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); rectMeshes.delete(r); }
+  for (const r of sim.rects) {
+    const h = r.push ? 10 : 8;
+    let m = rectMeshes.get(r);
+    if (!m || m.userData.w !== r.w || m.userData.d !== r.h) {
+      if (m) { scene.remove(m); m.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); }
+      m = new THREE.Group(); m.userData = { w: r.w, d: r.h };
+      const body = new THREE.Mesh(new THREE.BoxGeometry(r.w, h, r.h), new THREE.MeshStandardMaterial({ color: r.push ? '#c9a26b' : '#4b4f57', roughness: 0.85 }));
+      body.castShadow = true; body.receiveShadow = true; m.add(body);
+      m.add(new THREE.LineSegments(new THREE.EdgesGeometry(body.geometry), new THREE.LineBasicMaterial({ color: r.push ? '#8a6a3a' : '#2c2f35' })));
+      scene.add(m); rectMeshes.set(r, m);
+    }
+    m.position.set(r.x + r.w / 2 - 150, h / 2, r.y + r.h / 2 - 100);
+  }
 }
 
 function updateTextures() {
@@ -138,12 +176,22 @@ function frame() {
   const sim = SP.sim; if (!sim) return;
   const w = host.clientWidth, h = host.clientHeight;
   if (w && h && (w !== lastW || h !== lastH)) { lastW = w; lastH = h; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+  // 車子：位置與方向
+  rig.position.set(sim.x - 150, 0, sim.y - 100); rig.rotation.y = -sim.th;
   // 輪子：馬達編碼器的度數（正＝車子往前）→ 繞車軸轉動
   wheelL.rotation.x = -sim.mL.deg * Math.PI / 180; wheelR.rotation.x = -sim.mR.deg * Math.PI / 180;
-  // 地板跟著車子走過的距離往後捲（10 公分 = 貼圖的 1 格，每張貼圖 10 公分）
-  const travel = ((sim.mL.deg + sim.mR.deg) / 2) * Math.PI * sim.wheelD / 360;
-  floorTex.offset.y = (travel / 10) % 1;
+  // 場地改了（貼色紙、換場景）就更新地板；軌跡有變就更新（最多每 0.2 秒一次）
+  if (bgVer !== sim.bgVersion) { floorTex.needsUpdate = true; bgVer = sim.bgVersion; }
+  const now = performance.now();
+  if (trailVer !== sim.trailVersion && now - trailAt > 200) { trailTex.needsUpdate = true; trailVer = sim.trailVersion; trailAt = now; }
+  syncRects();
   updateTextures();
+  // 跟隨小車：鏡頭跟著車子平移，但保留使用者轉出來的角度和距離
+  if (mode === 'follow') {
+    const p = robotPos();
+    if (lastPos) camera.position.add(p.clone().sub(lastPos));
+    controls.target.set(p.x, controls.target.y > 0.5 ? 3.2 : 0, p.z); lastPos = p;
+  }
   controls.update();
   renderer.render(scene, camera);
 }
@@ -161,7 +209,8 @@ SP.car3d = {
   },
   stop() { cancelAnimationFrame(raf); raf = 0; },
   setView(name) { if (ready) setView(name); },
+  setMode(m) { if (ready) setMode(m); },
   isRunning: () => !!raf,
-  debug: () => ({ wl: wheelL.rotation.x, wr: wheelR.rotation.x, cam: camera.position.toArray(), dist: camera.position.distanceTo(controls.target), tex: floorTex.offset.y }),
+  debug: () => ({ wl: wheelL.rotation.x, wr: wheelR.rotation.x, cam: camera.position.toArray(), dist: camera.position.distanceTo(controls.target), mode, rig: [rig.position.x, rig.position.z, rig.rotation.y], rects: rectMeshes.size, target: controls.target.toArray() }),
 };
 document.dispatchEvent(new Event('car3d-ready'));

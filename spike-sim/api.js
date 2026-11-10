@@ -46,6 +46,10 @@
   const COLOR_NUM = { black: 0, blue: 3, green: 6, yellow: 7, red: 9, white: 10, none: -1 };
   SP.COLOR_NUM = COLOR_NUM;
 
+  // 減速曲線：離終點還剩 rem 度時，輪子最多能轉多快（等減速度煞車；最後一步剛好停在終點，不會一路爬行）
+  const DECEL = 4000, STEP = 0.01;   // 輪子減速度（度/秒²）、模擬步長（秒）
+  const capDps = (rem) => Math.min(Math.sqrt(2 * DECEL * Math.max(rem, 0)), Math.max(rem, 0) / STEP);
+
   SP.createApi = function (sim, io) {
     const num = (v) => { v = Number(v); return isFinite(v) ? v : 0; };
     const clamp = (v) => Math.max(-100, Math.min(100, num(v)));
@@ -71,8 +75,8 @@
       const d0 = [sim.mL.deg, sim.mR.deg]; sim.lastMoveT = sim.simTime;
       await sim.waitUntil(() => {
         const rem = deg - Math.max(Math.abs(sim.mL.deg - d0[0]), Math.abs(sim.mR.deg - d0[1]));
-        if (rem <= 0.3 || sim.stalled()) return true;
-        const k = Math.min(1, Math.max(0.04, rem * 0.5 / big)); sim.drive(l * k, r * k); return false;
+        if (rem <= 0.05 || sim.stalled()) return true;
+        const k = Math.min(1, capDps(rem) / (big * 10)); sim.drive(l * k, r * k); return false;
       });
       sim.stopAll();
     }
@@ -109,8 +113,8 @@
         const th0 = sim.th; sim.lastMoveT = sim.simTime;
         await sim.waitUntil(() => {
           const rem = deg - dir * (sim.th - th0) * 180 / Math.PI;
-          if (rem <= 0.1 || sim.stalled()) return true;
-          const s = Math.max(3, Math.min(sp, rem * 1.5)); sim.drive(dir * s, -dir * s); return false;
+          if (rem <= 0.05 || sim.stalled()) return true;
+          const s = Math.min(sp, capDps(rem * sim.track / sim.wheelD) / 10); sim.drive(dir * s, -dir * s); return false;
         });
         sim.stopAll();
       },
@@ -135,8 +139,8 @@
         const d0 = m.deg, dir = Math.sign(deg); sim.lastMoveT = sim.simTime;
         await sim.waitUntil(() => {
           const rem = Math.abs(deg) - dir * (m.deg - d0);
-          if (rem <= 0.5 || sim.stalled()) { m.dps = 0; return true; }
-          m.dps = dir * Math.max(8, Math.min(sp, rem * 0.5)) * 10; return false;
+          if (rem <= 0.05 || sim.stalled()) { m.dps = 0; return true; }
+          m.dps = dir * Math.min(sp * 10, capDps(rem)); return false;
         });
         m.dps = 0;
       },
