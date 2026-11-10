@@ -103,13 +103,15 @@
           <div id="three-host"></div>
           <div class="v3bar">
             <span class="muted">滑鼠拖曳＝旋轉、滾輪＝縮放、右鍵拖曳＝平移</span>
+            <button class="pill small camon" data-cam="follow" type="button">跟隨小車</button>
+            <button class="pill small" data-cam="arena" type="button">場地全景</button>
             <button class="pill small" data-view="iso" type="button">立體</button>
             <button class="pill small" data-view="front" type="button">正視</button>
             <button class="pill small" data-view="right" type="button">側視</button>
             <button class="pill small" data-view="top" type="button">上視</button>
             <button class="pill small" data-view="back" type="button">後視</button>
           </div>
-          <div class="v3note" id="v3note">示意模型（尺寸依模擬器：輪徑 5.6 公分、輪距 11.2 公分），不是官方三視圖。</div>
+          <div class="v3note" id="v3note">示意模型（尺寸依模擬器：輪徑 5.6 公分、輪距 11.2 公分），不是官方三視圖。場地與障礙物跟著「場地」分頁同步。</div>
         </div>
         <div class="stage-bar" id="stagebar2d">
           <button class="pill" id="btn-reset" type="button">重設位置</button>
@@ -186,6 +188,7 @@
 <script src="sim.js"></script>
 <script src="api.js"></script>
 <script src="blocks.js"></script>
+<script src="toolbox.js"></script>
 <script src="pygen.js"></script>
 <script src="pyrun.js"></script>
 <script src="app.js"></script>

@@ -13,6 +13,7 @@
     move: { scrollbars: true, drag: true, wheel: false },
     grid: { spacing: 24, length: 2, colour: '#e3e6ec' },
     trashcan: false,
+    ...(SP.toolboxPlugin ? { plugins: { toolbox: SP.toolboxPlugin } } : {}),
   });
 
   ws.registerToolboxCategoryCallback('PROCEDURE', (w) => Blockly.Procedures.flyoutCategory(w).filter((el) => {
@@ -24,6 +25,7 @@
     list.push(Blockly.utils.xml.textToDom('<block type="math_change"><value name="DELTA"><shadow type="math_number"><field name="NUM">1</field></shadow></value></block>'));
     return list;
   });
+  setTimeout(() => { const tb = ws.getToolbox(); if (tb && tb.getToolboxItems().length) tb.setSelectedItem(tb.getToolboxItems()[0]); }, 0);
   const sim = new SP.Sim($('stage'));
 
   /* ---------- 訊息欄 ---------- */
@@ -100,7 +102,9 @@
   const applySize = () => {
     const it = sim.selected; if (!it || it.k === 'line') return;
     const w = Math.max(2, Math.min(300, Number($('prop-w').value) || it.w)), h = Math.max(2, Math.min(200, Number($('prop-h').value) || it.h));
+    const ox0 = it.x, oy0 = it.y, w0 = it.w, h0 = it.h;
     it.w = w; it.h = h; if (it.x + w > 300) it.x = 300 - w; if (it.y + h > 200) it.y = 200 - h;
+    if (it.k !== 'patch' && sim.overlapsRobot(it)) { it.x = ox0; it.y = oy0; it.w = w0; it.h = h0; refreshProps(); $('hintline').textContent = '這個大小會壓到機器人，已還原'; return; }
     if (it.k === 'patch') sim.redrawBg(); else { it.ox = it.x; it.oy = it.y; }
     autosave();
   };
@@ -145,10 +149,10 @@
     const [cx, cy] = sim.toCm(ev);
     if (drag.mode === 'draw') { updatePreview(cx, cy); return; }
     const h = drag.hit;
-    if (h.type === 'robot') { sim.x = Math.max(8, Math.min(292, cx)); sim.y = Math.max(8, Math.min(192, cy)); sim.lastMoveT = sim.simTime; }
+    if (h.type === 'robot') sim.dragRobotTo(cx, cy);
     else if (h.type === 'rect') {
-      const r = h.item; r.x = Math.max(0, Math.min(300 - r.w, cx - h.dx)); r.y = Math.max(0, Math.min(200 - r.h, cy - h.dy));
-      if (!running) { r.ox = r.x; r.oy = r.y; }
+      const r = h.item, nx = Math.max(0, Math.min(300 - r.w, cx - h.dx)), ny = Math.max(0, Math.min(200 - r.h, cy - h.dy));
+      if (!sim.overlapsRobot({ x: nx, y: ny, w: r.w, h: r.h })) { r.x = nx; r.y = ny; if (!running) { r.ox = r.x; r.oy = r.y; } }
     } else if (h.type === 'floor') { sim.moveFloor(h.item, cx - drag.last[0], cy - drag.last[1]); drag.last = [cx, cy]; }
   });
   const endDrag = () => {
@@ -159,6 +163,7 @@
         let { x, y, w, h } = p; const def = tool === 'patch' ? 15 : 10;
         if (w < 3 || h < 3) { w = def; h = def; x = clampX(drag.x0 - w / 2); y = clampY(drag.y0 - h / 2); }
         x = Math.max(0, Math.min(300 - w, x)); y = Math.max(0, Math.min(200 - h, y));
+        if (tool !== 'patch' && sim.overlapsRobot({ x, y, w, h })) { $('hintline').textContent = '這裡有機器人，不能把方塊或牆放在機器人身上（先把機器人拖走）'; drag = null; stage.classList.remove('drag'); return; }
         it = tool === 'patch' ? sim.addFloor({ k: 'patch', x, y, w, h, color: p.color }) : sim.addRect(tool === 'wall' ? 'wall' : 'box', x, y, w, h);
       }
       if (it) { sim.selected = it; refreshProps(); autosave(); }
@@ -186,6 +191,10 @@
   }
   $('vt-2d').onclick = () => showView('2d'); $('vt-3d').onclick = () => showView('3d');
   document.querySelectorAll('.v3bar [data-view]').forEach((b) => { b.onclick = () => SP.car3d && SP.car3d.setView(b.dataset.view); });
+  document.querySelectorAll('.v3bar [data-cam]').forEach((b) => { b.onclick = () => {
+    if (!SP.car3d) return; SP.car3d.setMode(b.dataset.cam);
+    document.querySelectorAll('.v3bar [data-cam]').forEach((x) => x.classList.toggle('camon', x === b));
+  }; });
   $('btn-fs').onclick = async () => {
     try { if (document.fullscreenElement) await document.exitFullscreen(); else await $('stage-card').requestFullscreen(); }
     catch (e) { $('hintline').textContent = '這個瀏覽器不允許全螢幕：' + e.message; }
@@ -219,7 +228,8 @@
   const POWER_CSS = { 0: '#222', 1: '#ff2bd0', 2: '#8a2be2', 3: '#2a62ff', 4: '#40c0ff', 5: '#20e0c0', 6: '#22c55e', 7: '#ffd400', 8: '#ff8c1a', 9: '#ff2d2d', 10: '#fff' };
   const CN = { black: '黑色', white: '白色', red: '紅色', yellow: '黃色', green: '綠色', blue: '藍色', none: '無' };
   function refreshHub() {
-    portEl.A.textContent = Math.round(sim.mL.deg) + '°'; portEl.B.textContent = Math.round(sim.mR.deg) + '°';
+    const posTxt = (m) => '位置 ' + (((Math.round(m.deg) % 360) + 360) % 360) + '°（共轉 ' + (m.deg / 360).toFixed(1) + ' 圈）';
+    portEl.A.textContent = posTxt(sim.mL); portEl.B.textContent = posTxt(sim.mR);
     for (const p of ['C', 'D', 'E', 'F']) {
       const t = sim.ports[p];
       portEl[p].textContent = t === 'color' ? CN[sim.color()] + '／反射光 ' + sim.light() + '%'

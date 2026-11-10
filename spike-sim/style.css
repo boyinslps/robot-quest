@@ -188,3 +188,13 @@ dialog li { margin: 6px 0; line-height: 1.55; }
 #stage-card:fullscreen .view3d { flex: 1; aspect-ratio: auto; min-height: 0; }
 #stage-card:fullscreen .fs-runbar { display: flex; }
 #stage-card:fullscreen .card-h { font-size: 16px; }
+
+/* 連續抽屜的類別標題 */
+.cat-label .blocklyFlyoutLabelText { font: 800 17px "Noto Sans TC","Microsoft JhengHei",sans-serif !important; fill: #575e75; }
+.cat-label-馬達 .blocklyFlyoutLabelText { fill: #0090f5; } .cat-label-移動 .blocklyFlyoutLabelText { fill: #ff4ccd; }
+.cat-label-燈光 .blocklyFlyoutLabelText { fill: #9b78e6; } .cat-label-聲音 .blocklyFlyoutLabelText { fill: #c061f1; }
+.cat-label-事件 .blocklyFlyoutLabelText { fill: #d6a800; } .cat-label-控制 .blocklyFlyoutLabelText { fill: #f0a000; }
+.cat-label-感測 .blocklyFlyoutLabelText { fill: #12b0d8; } .cat-label-運算 .blocklyFlyoutLabelText { fill: #00b94d; }
+.cat-label-變數 .blocklyFlyoutLabelText { fill: #ff8f24; } .cat-label-我的積木 .blocklyFlyoutLabelText { fill: #ff6680; }
+
+.pill.camon { background: var(--blue); color: #fff; border-color: var(--blue); }
