@@ -56,6 +56,9 @@
   const UNIT_MOVE = [['公分', 'cm'], ['圈', 'rot'], ['度', 'deg'], ['英寸', 'in'], ['秒', 'sec']];
   const UNIT_MOTOR = [['圈', 'rot'], ['度', 'deg'], ['秒', 'sec']];
   const SIDE = [['左', 'left'], ['右', 'right']];
+  const TILTS = [['向前', 'forward'], ['向後', 'backward'], ['向左', 'left'], ['向右', 'right'], ['任一方向', 'any'], ['平放', 'flat']];
+  const GESTURES = [['被搖晃', 'shaken'], ['被輕拍', 'tapped'], ['自由落體', 'falling']];
+  const ORIENTS = [['上面', '0'], ['前面', '1'], ['右面', '2'], ['下面', '3'], ['後面', '4'], ['左面', '5']];
 
   const DEFS = [
     /* 事件 */
@@ -69,6 +72,10 @@
     { type: 'sp_when_message', message0: '當收到訊息 %1', args0: [{ type: 'field_input', name: 'MSG', text: '訊息1' }], nextStatement: null, style: 'event_blocks' },
     { type: 'sp_broadcast', message0: '傳送訊息 %1', args0: [{ type: 'field_input', name: 'MSG', text: '訊息1' }], ...stmt, style: 'event_blocks' },
     { type: 'sp_broadcast_wait', message0: '傳送訊息 %1 並等待', args0: [{ type: 'field_input', name: 'MSG', text: '訊息1' }], ...stmt, style: 'event_blocks' },
+
+    { type: 'sp_when_tilt', message0: '當主機傾斜 %1', args0: [dd('DIR', TILTS)], nextStatement: null, style: 'event_blocks' },
+    { type: 'sp_when_gesture', message0: '當主機 %1', args0: [dd('G', GESTURES)], nextStatement: null, style: 'event_blocks' },
+    { type: 'sp_when_orient', message0: '當 %1 朝上', args0: [dd('Q', ORIENTS)], nextStatement: null, style: 'event_blocks' },
 
     /* 馬達 */
     { type: 'sp_motor_run', message0: '%1 轉動 %2 %3 %4', args0: [dd('PORT', PORTS('A')), dd('DIR', DIR_CW), num('N'), dd('UNIT', UNIT_MOTOR)], ...stmt, style: 'motor_blocks' },
@@ -103,6 +110,7 @@
     { type: 'sp_light_rotate', message0: '旋轉燈陣 %1', args0: [dd('DIR', DIR_CW)], ...stmt, style: 'light_blocks' },
     { type: 'sp_light_orient', message0: '設定燈陣方向為 %1', args0: [dd('Q', [['正向', '0'], ['向右', '1'], ['上下顛倒', '2'], ['向左', '3']])], ...stmt, style: 'light_blocks' },
     { type: 'sp_power_light', message0: '設定電源鍵燈為 %1', args0: [dd('C', POWER_COLORS)], ...stmt, style: 'light_blocks' },
+    { type: 'sp_dist_light', message0: '%1 距離感測器的燈 %2 %3 %4 %5 %%', args0: [dd('PORT', SENSOR_PORTS('D')), num('A'), num('B'), num('C'), num('D')], ...stmt, style: 'light_blocks' },
     { type: 'sp_say', message0: '印出 %1 到訊息欄', args0: [{ type: 'input_value', name: 'T' }], ...stmt, style: 'light_blocks' },
     { type: 'sp_light_pattern', message0: '主機亮起 %1 圖案（舊）', args0: [dd('PAT', [['愛心', 'heart'], ['笑臉', 'smile'], ['難過', 'sad'], ['向上箭頭', 'up'], ['打勾', 'check'], ['打叉', 'cross']])], ...stmt, style: 'light_blocks' },
 
@@ -132,6 +140,9 @@
     { type: 'sp_angle', message0: '主機 %1 角', args0: [dd('AXIS', [['偏航', 'yaw'], ['俯仰', 'pitch'], ['滾動', 'roll']])], output: 'Number', style: 'sensor_blocks' },
     { type: 'sp_yaw', message0: '轉向角度', output: 'Number', style: 'sensor_blocks' },
     { type: 'sp_reset_yaw', message0: '將偏航角設為 0', ...stmt, style: 'sensor_blocks' },
+    { type: 'sp_tilt_is', message0: '主機傾斜 %1 ?', args0: [dd('DIR', TILTS)], output: 'Boolean', style: 'sensor_blocks' },
+    { type: 'sp_gesture_is', message0: '主機 %1 ?', args0: [dd('G', GESTURES)], output: 'Boolean', style: 'sensor_blocks' },
+    { type: 'sp_orient_is', message0: '%1 朝上 ?', args0: [dd('Q', ORIENTS)], output: 'Boolean', style: 'sensor_blocks' },
     { type: 'sp_button_is', message0: '%1 按鈕被按下 ?', args0: [dd('SIDE', SIDE)], output: 'Boolean', style: 'sensor_blocks' },
     { type: 'sp_timer', message0: '計時器', output: 'Number', style: 'sensor_blocks' },
     { type: 'sp_reset_timer', message0: '重設計時器', ...stmt, style: 'sensor_blocks' },
@@ -186,7 +197,7 @@
   const S = G.forBlock;
   const call = (c) => [c, O.FUNCTION_CALL];
 
-  for (const t of ['sp_start', 'sp_when_color', 'sp_when_force', 'sp_when_dist', 'sp_when_button', 'sp_when_timer', 'sp_when_cond', 'sp_when_message']) S[t] = () => '';
+  for (const t of ['sp_when_tilt', 'sp_when_gesture', 'sp_when_orient', 'sp_start', 'sp_when_color', 'sp_when_force', 'sp_when_dist', 'sp_when_button', 'sp_when_timer', 'sp_when_cond', 'sp_when_message']) S[t] = () => '';
   S.sp_broadcast = (b) => `api.broadcast(${q(f(b, 'MSG'))});\n`;
   S.sp_broadcast_wait = (b) => `await api.broadcastWait(${q(f(b, 'MSG'))});\n`;
   // 馬達
@@ -248,6 +259,10 @@
   S.sp_yaw = () => call('api.yaw()');
   S.sp_reset_yaw = () => 'api.resetYaw(0);\n';
   S.sp_button_is = (b) => call(`api.buttonIs(${q(f(b, 'SIDE'))})`);
+  S.sp_tilt_is = (b) => call(`api.tiltIs(${q(f(b, 'DIR'))})`);
+  S.sp_gesture_is = (b) => call(`api.gestureIs(${q(f(b, 'G'))})`);
+  S.sp_orient_is = (b) => [`(api.upFace() === ${f(b, 'Q')})`, O.EQUALITY];
+  S.sp_dist_light = (b) => `api.distLight(${v(b, 'A')}, ${v(b, 'B')}, ${v(b, 'C')}, ${v(b, 'D')});\n`;
   S.sp_timer = () => call('api.timer()');
   S.sp_reset_timer = () => 'api.resetTimer();\n';
   S.sp_force = (b) => call(`api.pressed(${q(f(b, 'PORT'))})`);
@@ -288,6 +303,9 @@
       else if (h.type === 'sp_when_dist') body = loop(`api.distCmp(${P}, ${f(h, 'OP') === '<' ? "'closer'" : "'farther'"}, ${v(h, 'N')}, 'pct')`);
       else if (h.type === 'sp_when_button') body = loop(f(h, 'STATE') === 'down' ? `api.buttonIs(${q(f(h, 'SIDE'))})` : `!api.buttonIs(${q(f(h, 'SIDE'))})`, f(h, 'STATE') === 'down' ? `api.buttonIs(${q(f(h, 'SIDE'))})` : `!api.buttonIs(${q(f(h, 'SIDE'))})`);
       else if (h.type === 'sp_when_timer') body = loop(`api.timer() > ${v(h, 'N')}`);
+      else if (h.type === 'sp_when_tilt') body = loop(`api.tiltIs(${q(f(h, 'DIR'))})`);
+      else if (h.type === 'sp_when_gesture') body = loop(`api.gestureIs(${q(f(h, 'G'))})`);
+      else if (h.type === 'sp_when_orient') body = loop(`api.upFace() === ${f(h, 'Q')}`);
       else if (h.type === 'sp_when_cond') body = loop(v(h, 'C', 'false'));
       else if (h.type === 'sp_when_message') {
         const m = q(f(h, 'MSG'));
@@ -321,11 +339,11 @@
       cat('燈光', 'light', 'light_category', [
         blk('sp_light_image_for', { S: n(2) }), blk('sp_light_image'), blk('sp_light_text', { T: txt('你好') }), blk('sp_light_off'),
         blk('sp_light_bright', { B: n(75) }), blk('sp_light_pixel', { X: n(1), Y: n(1), B: n(100) }),
-        blk('sp_light_rotate'), blk('sp_light_orient'), blk('sp_power_light'), blk('sp_say', { T: txt('你好') }),
+        blk('sp_light_rotate'), blk('sp_light_orient'), blk('sp_power_light'), blk('sp_dist_light', { A: n(100), B: n(100), C: n(100), D: n(100) }), blk('sp_say', { T: txt('你好') }),
       ]),
       cat('聲音', 'sound', 'sound_category', [blk('sp_beep', { NOTE: n(60), S: n(0.2) }), blk('sp_beep_start', { NOTE: n(60) }), blk('sp_stop_sound')]),
       cat('事件', 'event', 'event_category', [
-        blk('sp_start'), blk('sp_when_color'), blk('sp_when_force'), blk('sp_when_dist', { N: n(8) }), blk('sp_when_button'),
+        blk('sp_start'), blk('sp_when_color'), blk('sp_when_force'), blk('sp_when_dist', { N: n(8) }), blk('sp_when_button'), blk('sp_when_tilt'), blk('sp_when_gesture'), blk('sp_when_orient'),
         blk('sp_when_timer', { N: n(10) }), blk('sp_when_cond'), blk('sp_when_message'), blk('sp_broadcast'), blk('sp_broadcast_wait'),
       ]),
       cat('控制', 'control', 'control_category', [
@@ -336,7 +354,7 @@
       cat('感測', 'sensor', 'sensor_category', [
         blk('sp_color_is'), blk('sp_color'), blk('sp_reflect_is', { N: n(50) }), blk('sp_light'),
         blk('sp_pressed_is'), blk('sp_force_val'), blk('sp_dist_is', { N: n(15) }), blk('sp_dist'),
-        blk('sp_angle'), blk('sp_yaw'), blk('sp_reset_yaw'), blk('sp_button_is'), blk('sp_timer'), blk('sp_reset_timer'),
+        blk('sp_angle'), blk('sp_yaw'), blk('sp_reset_yaw'), blk('sp_tilt_is'), blk('sp_gesture_is'), blk('sp_orient_is'), blk('sp_button_is'), blk('sp_timer'), blk('sp_reset_timer'),
       ]),
       cat('運算', 'operator', 'operator_category', [
         blk('math_random_int', { FROM: n(1), TO: n(10) }),

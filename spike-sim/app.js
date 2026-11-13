@@ -183,7 +183,7 @@
   }
   function start3d() {
     const note = $('v3note');
-    const go = () => { SP.car3d.start($('three-host')); note.textContent = '示意模型（尺寸依模擬器：輪徑 5.6 公分、輪距 11.2 公分），不是官方三視圖。程式跑起來輪子會跟著轉。'; };
+    const go = () => { SP.car3d.start($('three-host')); note.textContent = '這是簡化的小車模型（輪子直徑 5.6 公分、兩輪相距 11.2 公分），和真的積木車長得不完全一樣。程式跑起來輪子會跟著轉。'; };
     if (SP.car3d) { go(); return; }
     note.textContent = '正在載入 3D 模組…';
     const t = setTimeout(() => { if (!SP.car3d) note.textContent = location.protocol === 'file:' ? '3D 預覽需要用網址開啟：瀏覽器不允許「雙擊檔案開啟」載入 3D 模組。請改用線上網址，或在資料夾裡開一個本機網頁伺服器。' : '3D 模組載入失敗（需要網路連到 cdn.jsdelivr.net）。'; }, location.protocol === 'file:' ? 1500 : 12000);
@@ -325,7 +325,7 @@
   const errs = [];
   const SENSOR_TYPE = {
     sp_color_is: 'color', sp_color: 'color', sp_reflect_is: 'color', sp_light: 'color', sp_when_color: 'color',
-    sp_dist: 'distance', sp_dist_is: 'distance', sp_dist_less: 'distance', sp_when_dist: 'distance',
+    sp_dist: 'distance', sp_dist_is: 'distance', sp_dist_less: 'distance', sp_when_dist: 'distance', sp_dist_light: 'distance',
     sp_force: 'force', sp_pressed_is: 'force', sp_force_val: 'force', sp_when_force: 'force',
   };
   const MOTOR_TYPES = new Set(['sp_motor_run', 'sp_motor_goto', 'sp_motor_start', 'sp_motor_stop', 'sp_motor_speed_set', 'sp_motor_pos', 'sp_motor_speed', 'sp_motor_relpos', 'sp_motor_setrel', 'sp_motor_turn']);
@@ -471,7 +471,14 @@
   /* ---------- 首頁與範例 ---------- */
   const eq = (type, fields, inputs, next) => ({ type, ...(fields ? { fields } : {}), ...(inputs ? { inputs } : {}), ...(next ? { next: { block: next } } : {}) });
   const ife = (inputs) => ({ ...eq('controls_if', null, inputs), extraState: { hasElse: true } });
+  const LESSON = (name, desc, color, blocks) => ({ name, desc, scene: 'blank', color, view: 'comp', ws: { blocks: { languageVersion: 0, blocks } } });
   const SAMPLES = [
+    LESSON('入門 1・母體燈', '讓主機的 5×5 小燈亮出笑臉。跑完到「元件模擬」看小燈；再把圖案換成別的試試。', '#b896f8', [eq('sp_start', null, null, eq('sp_light_image', { IMG: '3' }))].map((b) => ({ ...b, x: 40, y: 40 }))),
+    LESSON('入門 2・馬達', '設定速度 75%，讓馬達 A 轉 1 圈。把速度改大，看看轉得有沒有更快；也可以用滑鼠轉轉看馬達。', '#0090f5', [eq('sp_start', null, null, eq('sp_motor_speed_set', { PORT: 'A' }, { P: nb(75) }, eq('sp_motor_run', { PORT: 'A', DIR: '1', UNIT: 'rot' }, { N: nb(1) })))].map((b) => ({ ...b, x: 40, y: 40 }))),
+    LESSON('入門 3・顏色感測器', '看到紅色，主機就亮起笑臉。把紅色色塊拖到感測器前面試試；再把積木改成黃色。', '#34ccf1', [eq('sp_when_color', { PORT: 'C', COLOR: 'red' }, null, eq('sp_light_image', { IMG: '3' }))].map((b) => ({ ...b, x: 40, y: 40 }))),
+    LESSON('入門 4・距離感測器', '東西靠近到 20% 以內，主機就嗶一聲。把物體拖近感測器；再把數字改大，從更遠的地方就會嗶。', '#34ccf1', [eq('sp_when_dist', { PORT: 'D', OP: '<' }, { N: nb(20) }, eq('sp_beep', null, { NOTE: nb(60), S: nb(0.2) }))].map((b) => ({ ...b, x: 40, y: 40 }))),
+    LESSON('入門 5・力傳感器', '按下力傳感器，馬達就轉；放開就停。用滑鼠按住黑色圓鈕試試。', '#34ccf1', [eq('sp_when_force', { PORT: 'E', STATE: 'down' }, null, eq('sp_motor_start', { PORT: 'A', DIR: '1' })), eq('sp_when_force', { PORT: 'E', STATE: 'up' }, null, eq('sp_motor_stop', { PORT: 'A' }))].map((b, i) => ({ ...b, x: 40, y: 40 + i * 120 }))),
+    LESSON('入門 6・陀螺儀', '主機向右傾斜時，小燈亮起笑臉；放平就關燈。在「元件模擬」用滑鼠拖主機傾斜，再把程式改成向左。', '#34ccf1', [eq('sp_when_tilt', { DIR: 'right' }, null, eq('sp_light_image', { IMG: '3' })), eq('sp_when_tilt', { DIR: 'flat' }, null, eq('sp_light_off'))].map((b, i) => ({ ...b, x: 40, y: 40 + i * 120 }))),
     { name: '走正方形', desc: '重複 4 次：前進 40 公分、右轉 90 度。', scene: 'blank', color: '#4c97ff', ws: DEFAULT },
     { name: '遇牆就轉彎', desc: '一直重複：距離小於 20 公分就右轉，不然前進。', scene: 'boxes', color: '#5cb1d6', ws: { blocks: { languageVersion: 0, blocks: [eq('sp_start', null, null, eq('sp_forever', null, { DO: { block: ife({
       IF0: { block: eq('sp_dist_less', { PORT: 'D', OP: '<' }, { N: nb(20) }) }, DO0: { block: eq('sp_turn', { DIR: '1' }, { DEG: nb(90) }) }, ELSE: { block: eq('sp_move', { DIR: '1', UNIT: 'cm' }, { N: nb(5) }) } }) } })) ] } } },
@@ -507,9 +514,12 @@
     tile($('tiles-start'), '新專案', '從空白開始，只有「當程式開始」。', '#4c97ff', '+', () => restore({ workspace: { blocks: { languageVersion: 0, blocks: [{ type: 'sp_start', x: 40, y: 40 }] } }, name: '未命名專案' }));
     if (saved && saved.workspace) tile($('tiles-start'), '繼續：' + (saved.name || '未命名專案'), '回到上次編輯的內容。', '#2fb85f', '>', () => restore(saved));
     tile($('tiles-start'), '開啟檔案', '開啟之前儲存的 .json。', '#9966ff', '↑', () => $('file-open').click());
-    SAMPLES.forEach((s) => tile($('tiles-sample'), s.name, s.desc, s.color, s.py ? 'Py' : '▶', () => restore(s.py
-      ? { name: s.name, workspace: { blocks: { languageVersion: 0, blocks: [{ type: 'sp_start', x: 40, y: 40 }] } }, scene: s.scene, mode: 'python', py: s.py, pyDirty: true }
-      : { name: s.name, workspace: s.ws, scene: s.scene })));
+    SAMPLES.forEach((s) => tile($('tiles-sample'), s.name, s.desc, s.color, s.py ? 'Py' : '▶', () => {
+      restore(s.py
+        ? { name: s.name, workspace: { blocks: { languageVersion: 0, blocks: [{ type: 'sp_start', x: 40, y: 40 }] } }, scene: s.scene, mode: 'python', py: s.py, pyDirty: true }
+        : { name: s.name, workspace: s.ws, scene: s.scene });
+      if (s.view && SP.showView) SP.showView(s.view);
+    }));
   }
   $('btn-home').onclick = () => { stopProgram(); let sv = null; try { sv = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { /* 略 */ } buildHome(sv); $('home').hidden = false; };
 
@@ -519,4 +529,11 @@
   buildHome(saved);
   window.addEventListener('resize', () => Blockly.svgResize(ws));
   SP.ws = ws; SP.sim = sim; SP.run = runProgram;
+  SP.ui = {      // 給 bench.js（機構單獨測試面板）用
+    sim, api, ws, say, setMode, autosave, pySrc, POWER_CSS,
+    isRunning: () => running, isPyDirty: () => pyDirty, mode: () => mode,
+    loadPython(code) { pySrc.value = code; pyDirty = true; $('py-note').textContent = '已放入範例（不會變回積木）'; setMode('python'); updateGutter(); autosave(); },
+    refreshPortSelects() { for (const p of ['C', 'D', 'E', 'F']) if (portEl[p + 'sel']) portEl[p + 'sel'].value = sim.ports[p]; autosave(); },
+  };
+  if (SP.onUiReady) SP.onUiReady();
 })(window.SP = window.SP || {});
