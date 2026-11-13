@@ -85,7 +85,7 @@
     function setLed(rows, bright) {
       sim.led = rows.join('').split('').map((c) => (c === '#' ? bright : 0)); sim.displayText = '';
     }
-    function force() { return sim.pressed() ? 80 : 0; }   // 十分之一牛頓（0～100）：碰撞探針被壓到 = 8 牛頓
+    function force() { return sim.forceDeci(); }   // 十分之一牛頓（0～100）：碰撞探針被壓到 = 8 牛頓，也可以用力感測器面板手動給力
 
     const api = {
       hl: (id) => io.hl(id),
@@ -235,7 +235,26 @@
       buttonIs(side) { return !!sim.buttons[side]; },
       yaw: () => sim.yaw(),
       yawDeci: () => Math.round(-((sim.th - sim.yawOff) * 1800 / Math.PI)),
-      angle(axis) { return axis === 'yaw' ? sim.yaw() : 0; },     // 機器人平放在地上，俯仰與滾動固定為 0
+      angle(axis) { return axis === 'yaw' ? sim.yaw() : Math.round(axis === 'pitch' ? sim.hand.pitch : sim.hand.roll); },   // 俯仰、滾動：用陀螺儀面板「傾斜主機」才會有值（平放是 0）
+      tiltDeci: () => [Math.round(-((sim.th - sim.yawOff) * 1800 / Math.PI)), Math.round(sim.hand.pitch * 10), Math.round(sim.hand.roll * 10)],
+      tiltIs(dir) {
+        const p = sim.hand.pitch, r = sim.hand.roll, T = 15;
+        return dir === 'forward' ? p <= -T : dir === 'backward' ? p >= T : dir === 'left' ? r <= -T : dir === 'right' ? r >= T
+          : dir === 'any' ? (Math.abs(p) >= T || Math.abs(r) >= T) : (Math.abs(p) < T && Math.abs(r) < T);
+      },
+      gestureIs: (g) => sim.gesture() === g,
+      gestureNum() { const g = sim.gesture(); return g === 'tapped' ? 0 : g === 'shaken' ? 2 : g === 'falling' ? 3 : -1; },
+      tapCount: () => sim.hand.taps,
+      resetTaps() { sim.hand.taps = 0; },
+      // 哪一面朝上：0 上、1 前、2 右、3 下、4 後、5 左（依「車頭朝前」的方向，數字對照官方常數但方向未經真機驗證）
+      upFace() {
+        const p = sim.hand.pitch, r = sim.hand.roll;
+        if (Math.abs(p) > 135 || Math.abs(r) > 135) return 3;
+        if (p >= 45) return 1; if (p <= -45) return 4; if (r >= 45) return 5; if (r <= -45) return 2; return 0;
+      },
+      distLight(a, b, c, d) { sim.distLights = [a, b, c, d].map((v) => Math.max(0, Math.min(100, num(v)))); },
+      distLightGet: (i) => sim.distLights[i] || 0,
+      distLightPixel(i, v) { sim.distLights[i] = Math.max(0, Math.min(100, num(v))); },
       resetYaw(deci) { sim.yawOff = sim.th + (num(deci) * Math.PI) / 1800; },
       timer: () => sim.timer(),
       resetTimer() { sim.timerOff = sim.simTime; },

@@ -14,7 +14,7 @@
   P.INDENT = '    ';
   P.INFINITE_LOOP_TRAP = 'await runloop.sleep_ms(0)\n';
 
-  for (const t of ['sp_start', 'sp_when_color', 'sp_when_force', 'sp_when_dist', 'sp_when_button', 'sp_when_timer', 'sp_when_cond', 'sp_when_message']) S[t] = () => '';
+  for (const t of ['sp_when_tilt', 'sp_when_gesture', 'sp_when_orient', 'sp_start', 'sp_when_color', 'sp_when_force', 'sp_when_dist', 'sp_when_button', 'sp_when_timer', 'sp_when_cond', 'sp_when_message']) S[t] = () => '';
 
   const sgn = (d) => (String(d) === '-1' ? '-' : '');
   // 單位換成「馬達轉的度數」運算式
@@ -112,6 +112,14 @@
   };
   S.sp_yaw = () => [`round(${SP.yawSign === -1 ? '' : '-'}motion_sensor.tilt_angles()[0] / 10)`, PO.FUNCTION_CALL];
   S.sp_reset_yaw = () => 'motion_sensor.reset_yaw(0)\n';
+  const TILT_PY = { forward: 'motion_sensor.tilt_angles()[1] <= -150', backward: 'motion_sensor.tilt_angles()[1] >= 150', left: 'motion_sensor.tilt_angles()[2] <= -150', right: 'motion_sensor.tilt_angles()[2] >= 150',
+    any: '(abs(motion_sensor.tilt_angles()[1]) >= 150 or abs(motion_sensor.tilt_angles()[2]) >= 150)', flat: '(abs(motion_sensor.tilt_angles()[1]) < 150 and abs(motion_sensor.tilt_angles()[2]) < 150)' };
+  const GEST_PY = { shaken: 'motion_sensor.SHAKEN', tapped: 'motion_sensor.TAPPED', falling: 'motion_sensor.FALLING' };
+  const FACE_PY = ['TOP', 'FRONT', 'RIGHT', 'BOTTOM', 'BACK', 'LEFT'];
+  S.sp_tilt_is = (b) => [TILT_PY[f(b, 'DIR')], PO.RELATIONAL];
+  S.sp_gesture_is = (b) => [`motion_sensor.gesture() == ${GEST_PY[f(b, 'G')]}`, PO.RELATIONAL];
+  S.sp_orient_is = (b) => [`motion_sensor.up_face() == motion_sensor.${FACE_PY[Number(f(b, 'Q'))]}`, PO.RELATIONAL];
+  S.sp_dist_light = (b) => `distance_sensor.show(${PORT(f(b, 'PORT'))}, [round(${v(b, 'A')}), round(${v(b, 'B')}), round(${v(b, 'C')}), round(${v(b, 'D')})])\n`;
   S.sp_button_is = (b) => [`button.pressed(button.${f(b, 'SIDE').toUpperCase()}) > 0`, PO.RELATIONAL];
   S.sp_timer = () => ['(time.ticks_ms() - timer_start) / 1000', PO.MULTIPLICATIVE];
   S.sp_reset_timer = () => 'timer_start = time.ticks_ms()\n';
@@ -165,6 +173,9 @@
       } else if (h.type === 'sp_when_button') {
         const pr = `button.pressed(button.${f(h, 'SIDE').toUpperCase()}) > 0`; c = f(h, 'STATE') === 'down' ? pr : `not (${pr})`; inner = loop(c, body, `not (${c})`);
       } else if (h.type === 'sp_when_timer') { c = `(time.ticks_ms() - timer_start) / 1000 > ${v(h, 'N')}`; inner = loop(c, body, `not (${c})`); }
+      else if (h.type === 'sp_when_tilt') { c = TILT_PY[f(h, 'DIR')]; inner = loop(c, body, `not (${c})`); }
+      else if (h.type === 'sp_when_gesture') { c = `motion_sensor.gesture() == ${GEST_PY[f(h, 'G')]}`; inner = loop(c, body, `not (${c})`); }
+      else if (h.type === 'sp_when_orient') { c = `motion_sensor.up_face() == motion_sensor.${FACE_PY[Number(f(h, 'Q'))]}`; inner = loop(c, body, `not (${c})`); }
       else if (h.type === 'sp_when_cond') { c = v(h, 'C', 'False'); inner = loop(c, body, `not (${c})`); }
       else if (h.type === 'sp_when_message') {
         usesMsg = true; const m = q(f(h, 'MSG')); recv[f(h, 'MSG')] = (recv[f(h, 'MSG')] || 0) + 1;

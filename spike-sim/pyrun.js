@@ -101,15 +101,15 @@ class _Motion:
     TAPPED = 0; DOUBLE_TAPPED = 1; SHAKEN = 2; FALLING = 3; UNKNOWN = -1
     TOP = 0; FRONT = 1; RIGHT = 2; BOTTOM = 3; BACK = 4; LEFT = 5
     def tilt_angles(self):
-        return (_sp.yawDeci(), 0, 0)
+        return tuple(_sp.tiltDeci())
     def reset_yaw(self, angle=0):
         _sp.resetYaw(angle)
     def stable(self):
         return True
     def gesture(self):
-        return -1
+        return _sp.gestureNum()
     def up_face(self):
-        return 0
+        return _sp.upFace()
     def get_yaw_face(self):
         return 0
     def set_yaw_face(self, up):
@@ -117,9 +117,9 @@ class _Motion:
             raise ValueError("模擬器的機器人平放在地上，只支援 motion_sensor.TOP 當作偏航面")
         return True
     def tap_count(self):
-        return 0
+        return _sp.tapCount()
     def reset_tap_count(self):
-        pass
+        _sp.resetTaps()
     acceleration = _unsupported("motion_sensor.acceleration（沒有模擬加速度）")
     angular_velocity = _unsupported("motion_sensor.angular_velocity")
     quaternion = _unsupported("motion_sensor.quaternion")
@@ -243,13 +243,20 @@ class _Dist:
     def distance(self, port):
         return _sp.distMm(_pn(port))
     def clear(self, port):
-        _sp.distMm(_pn(port))
+        _sp.distLight(_pn(port), [0, 0, 0, 0])
+    def _idx(self, x, y):
+        if not (0 <= x <= 1 and 0 <= y <= 1):
+            raise ValueError("距離感測器只有 4 顆燈：x、y 要是 0 或 1（官方文件寫 0～3，模擬器依實體 4 顆燈處理）")
+        return y * 2 + x
     def get_pixel(self, port, x, y):
-        _sp.distMm(_pn(port)); return 0
+        return _sp.distLightGet(_pn(port), self._idx(x, y))
     def set_pixel(self, port, x, y, intensity):
-        _sp.distMm(_pn(port))
+        _sp.distLightSet(_pn(port), self._idx(x, y), intensity)
     def show(self, port, pixels):
-        _sp.distMm(_pn(port))
+        pixels = list(pixels)
+        if len(pixels) != 4:
+            raise ValueError("show() 需要 4 個亮度值")
+        _sp.distLight(_pn(port), pixels)
 distance_sensor = _Dist()
 _mod("distance_sensor", distance=distance_sensor.distance, clear=distance_sensor.clear, get_pixel=distance_sensor.get_pixel, set_pixel=distance_sensor.set_pixel, show=distance_sensor.show)
 
@@ -390,6 +397,8 @@ async def _spike_exec(src):
       motorGotoAbs: (p, pos, v, dir) => api.motorGoto(p, dir === 0 ? 'cw' : dir === 1 ? 'ccw' : 'short', pos, Math.abs(pct(v))),
       motorStop: (p) => api.motorStop(p), motorPos: (p) => api.motorPos(p), motorAbs: (p) => api.motorPosAbs(p),
       motorSetPos: (p, v) => api.motorSetPos(p, v), motorVel: (p) => api.motorVel(p),
+      tiltDeci: () => api.tiltDeci(), gestureNum: () => api.gestureNum(), upFace: () => api.upFace(), tapCount: () => api.tapCount(), resetTaps: () => api.resetTaps(),
+      distLight: (p, l) => { api.distMm(p); api.distLight(...Array.from(l)); }, distLightGet: (p, i) => { api.distMm(p); return api.distLightGet(i); }, distLightSet: (p, i, v) => { api.distMm(p); api.distLightPixel(i, v); },
       colorNum: (p) => api.colorNum(p), light: (p) => api.light(p), rgbi: (p) => api.rgbi(p), distMm: (p) => api.distMm(p),
       pressed: (p) => api.pressed(p), forceDeci: (p) => api.forceDeci(p), deviceReady: (p) => api.deviceReady(p),
       stopSim: () => { stopped = true; api.stopSim(); },

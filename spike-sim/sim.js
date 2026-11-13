@@ -125,6 +125,8 @@
       this.buttons = { left: 0, right: 0 };  // 主機左右按鈕，按下的毫秒數
       this.powerColor = -1; this.matrixRot = 0; this.matrixBright = 100;
       this.led = new Array(25).fill(0); this.displayText = '';
+      this.hand = { color: null, dist: null, force: null, pitch: 0, roll: 0, gesture: null, gestureUntil: 0, taps: 0 };   // 手動介入各個機構
+      this.lifted = false; this.distLights = [0, 0, 0, 0];
       this.floor = []; this.handPress = false; this.selected = null; this.preview = null; this.showGrid = false; this.editing = false;
       this.loadScene('blank');
       this._last = performance.now();
@@ -291,7 +293,8 @@
       const k = Math.PI * this.wheelD / 360, sl = dl * k * this.scaleL, sr = dr * k * this.scaleR;
       const ds = (sl + sr) / 2, dth = (sl - sr) / this.track, mid = this.th + dth / 2;
       let nx = this.x + ds * Math.sin(mid), ny = this.y - ds * Math.cos(mid), nth = this.th + dth;
-      if (!this.tryMove(nx, ny, nth)) {
+      if (this.lifted) { nx = this.x; ny = this.y; nth = this.th; if (Math.abs(dl) + Math.abs(dr) > 0) this.lastMoveT = this.simTime; }
+      else if (!this.tryMove(nx, ny, nth)) {
         nx = this.x; ny = this.y;
         if (!this.tryMove(nx, ny, nth)) nth = this.th;
       }
@@ -336,6 +339,8 @@
     /* --- 感測 --- */
     local(lx, ly) { const c = Math.cos(this.th), s = Math.sin(this.th); return [this.x + lx * c - ly * s, this.y + lx * s + ly * c]; }
     pixel() {
+      if (this.hand.color && this.hand.color !== 'none') { const h = FLOOR_COLOR[this.hand.color]; return [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)); }
+      if (this.hand.color === 'none') return [60, 60, 66];
       const [wx, wy] = this.local(0, -6.5);
       const px = Math.round(wx * PX), py = Math.round(wy * PX), d = this.bgData;
       if (px < 1 || py < 1 || px >= d.width - 1 || py >= d.height - 1) return [75, 79, 87];
@@ -345,11 +350,12 @@
       }
       return [r / 9, g / 9, b / 9];
     }
-    color() { const [r, g, b] = this.pixel(); return classify(r, g, b); }
-    light() { const [r, g, b] = this.pixel(); return Math.round((0.299 * r + 0.587 * g + 0.114 * b) / 2.55); }
+    color() { if (this.hand.color) return this.hand.color; const [r, g, b] = this.pixel(); return classify(r, g, b); }
+    light() { if (this.hand.color === 'none') return 0; const [r, g, b] = this.pixel(); return Math.round((0.299 * r + 0.587 * g + 0.114 * b) / 2.55); }
     distance() { return Math.round(this.distRaw()); }
     distanceMm() { const d = this.distRaw(); return d >= 200 ? -1 : Math.round(d * 10); }
     distRaw() {
+      if (this.hand.dist !== null) return Math.max(0, Math.min(200, this.hand.dist));
       const [ox, oy] = this.local(0, -HL);
       let best = 200;
       for (let k = -2; k <= 2; k++) {
@@ -360,12 +366,15 @@
       }
       return best;
     }
-    pressed() {
-      if (this.handPress) return true;
+    forceDeci() { if (this.hand.force !== null) return Math.round(Math.max(0, Math.min(10, this.hand.force)) * 10); return (this.handPress || this.bumped()) ? 80 : 0; }
+    pressed() { return this.forceDeci() > 0; }
+    bumped() {
       const [cx, cy] = this.local(0, -(HL + 0.75));
       if (obbOutside(cx, cy, this.th, 3.5, 0.75)) return true;
       return this.rects.some((r) => obbHitsRect(cx, cy, this.th, 3.5, 0.75, r));
     }
+    gesture() { return this.hand.gesture && performance.now() < this.hand.gestureUntil ? this.hand.gesture : null; }
+    doGesture(g) { this.hand.gesture = g; this.hand.gestureUntil = performance.now() + 1200; if (g === 'tapped') this.hand.taps++; }
     yaw() { let d = Math.round(this.yawSign * (this.th - this.yawOff) * 180 / Math.PI); d = ((d + 180) % 360 + 360) % 360 - 180; return d; }
     timer() { return Math.round((this.simTime - this.timerOff) * 10) / 10; }
 

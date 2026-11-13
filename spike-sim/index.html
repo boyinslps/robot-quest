@@ -63,6 +63,16 @@
     </section>
 
     <aside class="side">
+      <nav class="stepper" id="stepper" aria-label="機構單獨測試">
+        <button type="button" data-tab="field" class="on"><span class="sn car">車</span><b>整車場地</b></button>
+        <button type="button" data-tab="hub"><span class="sn">1</span><b>母體燈</b></button>
+        <button type="button" data-tab="motor"><span class="sn">2</span><b>馬達</b></button>
+        <button type="button" data-tab="color"><span class="sn">3</span><b>顏色感測器</b></button>
+        <button type="button" data-tab="dist"><span class="sn">4</span><b>距離感測器</b></button>
+        <button type="button" data-tab="force"><span class="sn">5</span><b>力傳感器</b></button>
+        <button type="button" data-tab="gyro"><span class="sn">6</span><b>陀螺儀感應器</b></button>
+      </nav>
+      <div id="tab-field">
       <div class="card stage-card" id="stage-card">
         <div class="card-h">
           <div class="vtabs" role="tablist" aria-label="畫面">
@@ -143,15 +153,18 @@
         </div>
       </div>
 
-      <div class="card set-card">
-        <div class="card-h"><span class="card-t">機器人設定</span><span class="muted">依你的車型校正</span></div>
+      </div>
+      <div id="benches"></div>
+
+      <details class="card set-card">
+        <summary class="card-h"><span class="card-t">機器人設定</span><span class="muted">依你的車型校正（點開）</span></summary>
         <div class="setgrid">
           <label>輪徑（毫米）<input type="number" id="set-wheel" value="56" min="20" max="120" step="1"></label>
           <label>輪距（毫米，兩輪中心）<input type="number" id="set-track" value="112" min="60" max="250" step="1"></label>
           <label>轉向角度方向<select id="set-yaw"><option value="1">順時針為正</option><option value="-1">逆時針為正</option></select></label>
           <label class="chk wide"><input type="checkbox" id="set-real"> 真實模式（馬達加減速、兩輪 ±1% 誤差）</label>
         </div>
-      </div>
+      </details>
 
       <div class="card log-card">
         <div class="card-h tabsh">
@@ -192,6 +205,7 @@
 <script src="pygen.js"></script>
 <script src="pyrun.js"></script>
 <script src="app.js"></script>
+<script src="bench.js"></script>
 <script type="module" src="car3d.js"></script>
 </body>
 </html>
