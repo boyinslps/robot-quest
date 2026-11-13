@@ -63,14 +63,9 @@
     </section>
 
     <aside class="side">
-      <nav class="stepper" id="stepper" aria-label="機構單獨測試">
-        <button type="button" data-tab="field" class="on"><span class="sn car">車</span><b>整車場地</b></button>
-        <button type="button" data-tab="hub"><span class="sn">1</span><b>母體燈</b></button>
-        <button type="button" data-tab="motor"><span class="sn">2</span><b>馬達</b></button>
-        <button type="button" data-tab="color"><span class="sn">3</span><b>顏色感測器</b></button>
-        <button type="button" data-tab="dist"><span class="sn">4</span><b>距離感測器</b></button>
-        <button type="button" data-tab="force"><span class="sn">5</span><b>力傳感器</b></button>
-        <button type="button" data-tab="gyro"><span class="sn">6</span><b>陀螺儀感應器</b></button>
+      <nav class="viewtabs" id="viewtabs" aria-label="模擬畫面">
+        <button type="button" data-view="field" class="on">場地模擬</button>
+        <button type="button" data-view="comp">元件模擬<span class="badge" id="comp-badge" hidden>0</span></button>
       </nav>
       <div id="tab-field">
       <div class="card stage-card" id="stage-card">
@@ -154,7 +149,7 @@
       </div>
 
       </div>
-      <div id="benches"></div>
+      <div id="tab-comp" hidden></div>
 
       <details class="card set-card">
         <summary class="card-h"><span class="card-t">機器人設定</span><span class="muted">依你的車型校正（點開）</span></summary>
@@ -189,7 +184,7 @@
     <li><b>布置場地</b>：按「布置場地」可以拖曳畫出方塊（機器人推得動）、牆、色紙、黑線膠帶，用「橡皮擦」刪除；「設為起點」會把機器人現在的位置當起點。「全螢幕」可以放大場地，上課投影很方便。「3D 車子」可以旋轉、縮放小車，程式跑起來輪子會跟著轉。</li>
     <li><b>感測器位置</b>：顏色感測器在機器人前方底部，距離感測器在最前方中央，力感測器是前方的碰撞探針。</li>
     <li><b>轉向角度</b>：順時針為正，範圍 −180～179。程式一開始會自動歸零。</li>
-    <li><b>一個一個試機構</b>：右邊上方的 1～6 分頁，依序是母體燈、馬達、顏色感測器、距離感測器、力傳感器、陀螺儀。每一頁都可以不寫程式，直接動手玩，也有「放入範例積木」讓你跟著做。</li>
+    <li><b>場地模擬／元件模擬</b>：右邊上方可以切換。「場地模擬」看車子在場地上跑；「元件模擬」會把你積木用到的零件（馬達、感測器、母體燈、陀螺儀）放出來，直接用滑鼠玩：按住圓鈕＝按壓、拖轉盤＝轉馬達、拖色塊或物體到感測器前面、拖主機＝傾斜。零件多的時候會自動分成好幾格。</li>
     <li><b>事件積木</b>：每一個「當…」積木是一條獨立的程式，會同時執行。主機的「左」「右」按鈕可以用滑鼠按住。</li>
     <li><b>對照官方</b>：積木與 Python 的名稱、預設值依 LEGO SPIKE 官方說明。模擬器還沒有的功能（音樂、圖表、天氣…）會在報錯台告訴你。</li>
     <li><b>Python</b>：上方切到「Python」會把積木轉成 SPIKE App 3 風格的 Python，也可以直接改。Python 改過之後不會變回積木。避免寫沒有 <code>await</code> 的無窮迴圈（會讓網頁卡住）。</li>
@@ -206,7 +201,7 @@
 <script src="pygen.js"></script>
 <script src="pyrun.js"></script>
 <script src="app.js"></script>
-<script src="bench.js"></script>
+<script src="comp.js"></script>
 <script type="module" src="car3d.js"></script>
 </body>
 </html>
