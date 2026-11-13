@@ -251,3 +251,6 @@ ol.try li::marker { font-weight: 900; color: #c99a00; }
 .set-card summary::-webkit-details-marker { display: none; }
 .hand-note { font-size: 12px; font-weight: 800; color: #b3261e; background: #ffeceb; border-radius: 8px; padding: 2px 8px; }
 @media (max-width: 1250px) { .stepper { grid-template-columns: repeat(2, 1fr); } .bench-body { grid-template-columns: 1fr; } }
+
+.bench .bench-foot { order: 1; position: sticky; bottom: 0; background: #fff; padding: 6px 0; z-index: 2; }
+.bench .try { order: 2; }

@@ -36,12 +36,14 @@
   const stopAll = () => { sim.abort(); sim.stopAll(); };
   function portSelect(type, ports) {
     const sel = h('select', { 'aria-label': '埠' }, ports.map((p) => h('option', { value: p, text: p })));
-    const warn = h('span', { class: 'hand-note', hidden: true, text: '還沒接上：積木會報錯' });
-    const cur = () => ports.find((p) => sim.ports[p] === type) || null;
-    sel.onchange = () => { for (const p of ports) if (sim.ports[p] === type) sim.ports[p] = 'none'; sim.ports[sel.value] = type; U.refreshPortSelects(); };
-    return { el: h('label', {}, '接在埠 ', sel, ' ', warn), get: () => sel.value, tick() { const c = cur(); if (c && sel.value !== c && document.activeElement !== sel) sel.value = c; warn.hidden = !!c; if (!c) sel.value = sel.value || ports[0]; } };
+    const find = () => ports.find((p) => sim.ports[p] === type) || null;
+    sel.onchange = () => { sim.ports[sel.value] = type; U.refreshPortSelects(); };
+    return { el: h('label', {}, '接在埠 ', sel), get: () => sel.value, connect() { if (!find()) { sim.ports[sel.value] = type; U.refreshPortSelects(); } },
+      tick() { const c = find(); if (c && sel.value !== c && document.activeElement !== sel) sel.value = c; } };
   }
-  const tryList = (steps) => h('ol', { class: 'try' }, steps.map((s) => h('li', { text: s })));
+  const tryList = (official, extra) => h('div', { class: 'try' },
+    h('b', { text: '照官方教學的順序操作（意譯，官方原文是英文）' }), h('ol', {}, official.map((t) => h('li', { text: t }))),
+    extra && extra.length ? [h('b', { text: '多試試（我自己加的，不是官方步驟）' }), h('ul', {}, extra.map((t) => h('li', { text: t })))] : null);
   const N = (x) => ({ shadow: { type: 'math_number', fields: { NUM: x } } });
   const T = (s) => ({ shadow: { type: 'text', fields: { TEXT: s } } });
   const B = (type, fields, inputs, next) => ({ type, ...(fields ? { fields } : {}), ...(inputs ? { inputs } : {}), ...(next ? { next: { block: next } } : {}) });
@@ -90,9 +92,10 @@
           h('div', { class: 'ctl' }, '寫入 ', txt, h('button', { class: 'pill', type: 'button', text: '寫入', onclick: () => api.lightText(txt.value) })),
           h('div', { class: 'ctl' }, '電源鍵燈'), h('div', { class: 'swatches' }, sw),
           h('div', { class: 'readouts' }, state.el, btns.el))),
-      tryList(['按「亮起」看 5×5 燈陣亮出圖案，換幾種圖案試試。', '拖動「亮度」，再按「順時針」旋轉燈陣。', '直接點燈陣上的格子，一顆一顆亮起來。', '按電源鍵燈的顏色。', '按住「左」「右」按鈕：程式用「當 左 按鈕 被按下」就能接到它。']),
-      examples('母體燈', () => [B('sp_start', null, null, chain(B('sp_light_image_for', { IMG: '1' }, { S: N(2) }), B('sp_light_text', null, { T: T('你好') }), B('sp_power_light', { C: '6' }), B('sp_light_off')))],
-        PY_HEAD + 'async def main():\n    light_matrix.show_image(light_matrix.IMAGE_HEART)\n    await runloop.sleep_ms(2000)\n    await light_matrix.write("你好")\n    light.color(light.POWER, color.GREEN)\n    light_matrix.clear()\n\nrunloop.run(main())\n'));
+      tryList(['01 認識：在主機上顯示一張笑臉。', '02 做程式：把「當程式開始」放上去，下面接「亮起 圖案」（官方積木叫 turn on）。', '03 按執行（播放）鈕，測試程式。', '04 主機顯示笑臉。', '05 把燈的圖案改成另一個圖案。', '06 再按一次執行，看新的燈光圖案。'],
+        ['直接點燈陣上的格子，一顆一顆亮起來。', '拖動「亮度」、按「順時針」旋轉燈陣；按電源鍵燈的顏色。', '按住「左」「右」按鈕，程式用「當 左 按鈕 被按下」就接得到。']),
+      examples('母體燈（官方第 1 課）', () => [B('sp_start', null, null, B('sp_light_image', { IMG: '3' }))],
+        PY_HEAD + 'async def main():\n    light_matrix.show_image(light_matrix.IMAGE_HAPPY)\n\nrunloop.run(main())\n'));
     benches.hub = { root, tick() {
       const r = sim.matrixRot;
       for (let cy = 0; cy < 5; cy++) for (let cx = 0; cx < 5; cx++) {
@@ -106,7 +109,7 @@
 
   /* ===== 2 馬達 ===== */
   (function () {
-    const port = portSelect('__motor__', ['A', 'B']); port.tick = () => {}; const sel = h('select', {}, h('option', { value: 'A', text: 'A（左輪）' }), h('option', { value: 'B', text: 'B（右輪）' }));
+    const sel = h('select', {}, h('option', { value: 'A', text: 'A（左輪）' }), h('option', { value: 'B', text: 'B（右輪）' }));
     const m = () => (sel.value === 'A' ? sim.mL : sim.mR);
     const needle = S('line', { x1: 70, y1: 70, x2: 70, y2: 20, stroke: '#e5483d', 'stroke-width': 5, 'stroke-linecap': 'round' });
     const ticks = []; for (let i = 0; i < 36; i++) { const a = rad(i * 10), big = i % 9 === 0, r1 = big ? 50 : 54;
@@ -133,9 +136,10 @@
           h('div', { class: 'ctl' }, '轉到位置 ', goSel, bt('最短路徑', () => api.motorGoto(sel.value, 'short', goSel.value)), bt('順時針', () => api.motorGoto(sel.value, 'cw', goSel.value)), bt('逆時針', () => api.motorGoto(sel.value, 'ccw', goSel.value))),
           h('div', { class: 'ctl' }, bt('開始轉動', () => api.motorStartDir(sel.value, 1)), h('button', { class: 'pill', type: 'button', text: '停止馬達', onclick: () => { stopAll(); } }), h('button', { class: 'pill', type: 'button', text: '相對位置歸零', onclick: () => api.motorSetPos(sel.value, 0) })),
           h('label', { class: 'chk' }, lift, '把車子架起來（輪子懸空，車子不會移動；才能用滑鼠轉動轉盤）'))),
-      tryList(['勾選「把車子架起來」，這樣只有馬達在轉，車子不會跑走。', '按「順時針 1 圈」：位置回到原點、相對位置 +360、共轉 +1 圈。', '把速度拉到 30%，再按一次，看轉得比較慢。', '選「270°」按「最短路徑」，看它走哪個方向；再試「順時針」「逆時針」。', '用滑鼠拖轉盤，像用手轉馬達：位置會跟著變。', '取消勾選再轉一次，車子會真的動起來（單顆輪子轉＝車子繞另一顆輪子轉）。']),
-      examples('馬達', () => [B('sp_start', null, null, chain(B('sp_motor_speed_set', { PORT: 'A' }, { P: N(50) }), B('sp_motor_run', { PORT: 'A', DIR: '1', UNIT: 'rot' }, { N: N(1) }), B('sp_wait', null, { S: N(0.5) }), B('sp_motor_goto', { PORT: 'A', MODE: 'short' }, { POS: N(0) })))],
-        PY_HEAD + 'async def main():\n    await motor.run_for_degrees(port.A, 360, 500)\n    await runloop.sleep_ms(500)\n    await motor.run_to_absolute_position(port.A, 0, 500, direction=motor.SHORTEST_PATH)\n    print("位置", motor.absolute_position(port.A))\n\nrunloop.run(main())\n'));
+      tryList(['01 認識：讓馬達轉起來。', '02 把馬達插在 A 埠（本模擬器 A 是左輪馬達）。', '03 做程式：「當程式開始」→「設定速度為 75%」→「A 轉動 ↻ 1 圈」。', '04 按執行，測試讓馬達轉動的程式。', '05 馬達在轉。', '06 把速度數字改大，馬達會轉得更快。', '07 再按一次執行，看馬達變快。'],
+        ['勾選「把車子架起來」，這樣只有馬達在轉、車子不會跑走。', '選「270°」按「最短路徑」「順時針」「逆時針」，看它走哪個方向。', '用滑鼠拖轉盤，像用手轉馬達：位置會跟著變。', '取消「架起來」再轉一次：單顆輪子轉＝車子繞另一顆輪子轉。']),
+      examples('馬達（官方第 2 課）', () => [B('sp_start', null, null, chain(B('sp_motor_speed_set', { PORT: 'A' }, { P: N(75) }), B('sp_motor_run', { PORT: 'A', DIR: '1', UNIT: 'rot' }, { N: N(1) })))],
+        PY_HEAD + 'async def main():\n    await motor.run_for_degrees(port.A, 360, 750)\n\nrunloop.run(main())\n'));
     benches.motor = { root, tick() {
       const d = m().deg; needle.setAttribute('transform', `rotate(${((d % 360) + 360) % 360} 70 70)`);
       rp.set(((Math.round(d) % 360) + 360) % 360 + '°'); rel.set(Math.round(d - (m().rel0 || 0)) + '°'); vel.set(Math.round(m().cur || 0)); turns.set((d / 360).toFixed(2));
@@ -158,10 +162,11 @@
       h('div', { class: 'bench-body' }, h('div', { class: 'bench-art' }, art),
         h('div', { style: 'display:flex;flex-direction:column;gap:8px' }, h('div', { class: 'readouts' }, nm.el, no.el, lt.el, rg.el),
           h('div', { class: 'ctl' }, '拿色卡放在感測器前面：'), h('div', { class: 'ctl' }, chips, none, field))),
-      tryList(['按「紅色」色卡：顏色變紅、官方編號 9。', '依序試黑色、白色：看反射光百分比怎麼變（黑色很低、白色很高）。', '按「沒有東西」：顏色是 −1（沒有顏色）。', '按「放開（看車子底下）」，到「整車場地」選「顏色區」，把車子拖到各色方塊上看讀值。', '放入範例，執行後再回來按不同色卡：看到紅色車子就會嗶一聲、亮起愛心。']),
-      examples('顏色感測器', () => [B('sp_start', null, null, B('sp_forever', null, { DO: { block: { type: 'controls_if', extraState: { hasElse: true }, inputs: { IF0: { block: B('sp_color_is', { PORT: 'C', COLOR: 'red' }) }, DO0: { block: chain(B('sp_beep', null, { NOTE: N(72), S: N(0.2) }), B('sp_light_image', { IMG: '1' })) }, ELSE: { block: B('sp_light_off') } } } } }))],
-        PY_HEAD + 'async def main():\n    while True:\n        if color_sensor.color(port.C) == color.RED:\n            await sound.beep(1047, 200, 100)\n            light_matrix.show_image(light_matrix.IMAGE_HEART)\n        else:\n            light_matrix.clear()\n\nrunloop.run(main())\n'));
-    benches.color = { root, tick() {
+      tryList(['01 認識：使用顏色感測器。', '02 把顏色感測器插上（官方插 A 埠；本模擬器 A、B 是輪子，感測器接在 C～F 其中一埠）。', '03 做程式：「當 顏色是 紅色」接「亮起 圖案」，用感測器點亮主機。', '04 按執行。', '05 拿一塊紅色積木放在感測器前面，看主機亮起來（這裡按「紅色」色卡）。', '06 把積木上的顏色從紅色改成黃色，感測器就會對黃色積木有反應。', '07 再按執行，拿黃色積木測試（按「黃色」色卡）。'],
+        ['按「黑色」「白色」，看反射光百分比怎麼變。', '按「沒有東西」：顏色是 −1。', '按「放開」，到「整車場地」選「顏色區」，把車子拖到各色方塊上看讀值。']),
+      examples('顏色感測器（官方第 3 課）', () => [B('sp_when_color', { PORT: 'C', COLOR: 'red' }, null, B('sp_light_image', { IMG: '3' }))],
+        PY_HEAD + 'async def main():\n    while True:\n        if color_sensor.color(port.C) == color.RED:\n            light_matrix.show_image(light_matrix.IMAGE_HAPPY)\n        else:\n            light_matrix.clear()\n        await runloop.sleep_ms(50)\n\nrunloop.run(main())\n'));
+    benches.color = { root, onShow() { port.connect(); }, tick() {
       port.tick(); const c = sim.color(), [r, g, b] = sim.pixel(), k = 1024 / 255;
       nm.set(COLOR_ZH[c]); no.set(COLOR_NUM[c]); lt.set(sim.light() + '%'); rg.set([r, g, b].map((v) => Math.round(v * k)).concat(Math.round((0.299 * r + 0.587 * g + 0.114 * b) * k)).join(' '));
       led.setAttribute('fill', COLOR_HEX[c]);
@@ -187,10 +192,11 @@
         h('div', { style: 'display:flex;flex-direction:column;gap:8px' }, h('div', { class: 'readouts' }, cm.el, inch.el, pc.el, mm.el),
           h('div', { class: 'ctl' }, h('label', { class: 'chk' }, use, '用手放一個物體在前面：'), sl, slv), bar,
           h('div', { class: 'ctl' }, '感測器的 4 顆燈 ', h('div', { class: 'dots' }, dots), lightBtn('全亮', [100, 100, 100, 100]), lightBtn('左眼', [100, 100, 0, 0]), lightBtn('右眼', [0, 0, 100, 100]), lightBtn('關閉', [0, 0, 0, 0])))),
-      tryList(['勾選「用手放一個物體在前面」，拖動距離：公分、英寸、百分比會一起變（200 公分以上＝沒偵測到，Python 會回 −1）。', '拉到 15 公分以下。', '按「全亮」「左眼」「右眼」看感測器的燈。', '取消勾選，改用「整車場地」：車子朝牆走，距離就是到牆的距離；拖一個方塊到前面也會被偵測到。', '放入範例，執行後把距離拉近到 15 公分以內，燈會全亮。']),
-      examples('距離感測器', () => [B('sp_start', null, null, B('sp_forever', null, { DO: { block: { type: 'controls_if', extraState: { hasElse: true }, inputs: { IF0: { block: B('sp_dist_is', { PORT: 'D', MODE: 'closer', UNIT: 'cm' }, { N: N(15) }) }, DO0: { block: B('sp_dist_light', { PORT: 'D' }, { A: N(100), B: N(100), C: N(100), D: N(100) }) }, ELSE: { block: B('sp_dist_light', { PORT: 'D' }, { A: N(0), B: N(0), C: N(0), D: N(0) }) } } } } }))],
-        PY_HEAD + 'async def main():\n    while True:\n        d = distance_sensor.distance(port.D)   # 毫米，沒偵測到是 -1\n        if 0 <= d < 150:\n            distance_sensor.show(port.D, [100, 100, 100, 100])\n        else:\n            distance_sensor.clear(port.D)\n\nrunloop.run(main())\n'));
-    benches.dist = { root, tick() {
+      tryList(['01 認識：使用距離感測器。', '02 把距離感測器插上（本模擬器接在 C～F 其中一埠）。', '03 做程式：「當 距離 更近於 20 %」接「播放嗶聲 60 持續 0.2 秒」，讓主機嗶一聲。', '04 按執行。', '05 把手放在感測器前面，聽主機嗶一聲（這裡勾選「用手放一個物體」並把距離拉近）。', '06 把積木上的距離數字改大一點，感測器從更遠的地方就會有反應。', '07 再按執行，把手放在感測器前面。'],
+        ['拉到 15 公分以下，看公分、英寸、百分比一起變；200 公分以上＝沒偵測到，Python 回 −1。', '按「全亮」「左眼」「右眼」看感測器的燈（官方積木「距離感測器燈」）。', '取消勾選改用「整車場地」：車子朝牆走，距離就是到牆的距離。']),
+      examples('距離感測器（官方第 4 課）', () => [B('sp_when_dist', { PORT: 'D', OP: '<' }, { N: N(20) }, B('sp_beep', null, { NOTE: N(60), S: N(0.2) }))],
+        PY_HEAD + 'async def main():\n    while True:\n        d = distance_sensor.distance(port.D)   # 毫米，沒偵測到是 -1\n        if 0 <= d < 200:\n            await sound.beep(262, 200, 100)\n            distance_sensor.show(port.D, [100, 100, 100, 100])\n        else:\n            distance_sensor.clear(port.D)\n        await runloop.sleep_ms(50)\n\nrunloop.run(main())\n'));
+    benches.dist = { root, onShow() { port.connect(); }, tick() {
       port.tick(); const d = sim.distRaw(); cm.set(Math.round(d)); inch.set((d / 2.54).toFixed(1)); pc.set(Math.round(d / 2) + '%'); mm.set(sim.distanceMm());
       barFill.style.width = (d / 2) + '%'; use.checked = sim.hand.dist !== null;
       dots.forEach((x, i) => { const v = sim.distLights[i] || 0; x.style.background = v ? `rgb(${60 + v * 1.9},${200},${255})` : ''; });
@@ -216,10 +222,11 @@
       h('div', { class: 'bench-body' }, h('div', { class: 'bench-art' }, art, btn),
         h('div', { style: 'display:flex;flex-direction:column;gap:8px' }, h('div', { class: 'readouts' }, n.el, pc.el, stt.el, dn.el), bar,
           h('div', { class: 'ctl' }, '固定施力 ', sl, slv), h('div', { class: 'ctl', style: 'font-weight:600;color:#7b8196' }, '按下＝大於 0 牛頓；重壓＝5 牛頓以上；放開＝0。'))),
-      tryList(['按住黑色大按鈕：按得越久力越大，狀態從「放開」變「按下」，超過 5 牛頓變「重壓」。', '放開按鈕，力回到 0。', '拖「固定施力」到 3，再到 8，看狀態。', '到「整車場地」，車子往牆走撞到牆：力感測器（前面的碰撞探針）也會被按下。', '放入範例，執行後按黑色按鈕：按下就會嗶一聲。']),
-      examples('力傳感器', () => [B('sp_start', null, null, chain(B('sp_wait_until', null, { C: { block: B('sp_pressed_is', { PORT: 'E', STATE: 'pressed' }) } }), B('sp_beep', null, { NOTE: N(72), S: N(0.3) }), B('sp_light_image', { IMG: '4' })))],
-        PY_HEAD + 'async def main():\n    await runloop.until(lambda: force_sensor.pressed(port.E))\n    await sound.beep(1047, 300, 100)\n    light_matrix.show_image(light_matrix.IMAGE_SMILE)\n    print("力", force_sensor.force(port.E), "十分之一牛頓")\n\nrunloop.run(main())\n'));
-    benches.force = { root, tick() {
+      tryList(['01 認識：使用力傳感器。', '02 馬達插 A 埠、力傳感器插 B 埠（本模擬器 A 是輪子馬達，力傳感器接在 C～F 其中一埠）。', '03 做程式：「當 力傳感器 被按下」接「A 開始轉動」；「當 被放開」接「A 停止馬達」（停止積木是我從官方積木盤推測的接法）。', '04 按執行。', '05 按下力傳感器，讓馬達轉動（按黑色大按鈕）。'],
+        ['按得越久力越大，超過 5 牛頓叫「重壓」。', '拖「固定施力」到 3，再到 8，看狀態。', '到「整車場地」，車子往牆走撞到牆：前面的碰撞探針也會把它按下。']),
+      examples('力傳感器（官方第 5 課）', () => [B('sp_when_force', { PORT: 'E', STATE: 'down' }, null, B('sp_motor_start', { PORT: 'A', DIR: '1' })), B('sp_when_force', { PORT: 'E', STATE: 'up' }, null, B('sp_motor_stop', { PORT: 'A' }))],
+        PY_HEAD + 'async def main():\n    while True:\n        if force_sensor.pressed(port.E):\n            motor.run(port.A, 500)\n        else:\n            motor.stop(port.A)\n        await runloop.sleep_ms(20)\n\nrunloop.run(main())\n'));
+    benches.force = { root, onShow() { port.connect(); }, tick() {
       port.tick(); const dnv = sim.forceDeci(); n.set((dnv / 10).toFixed(1)); pc.set(dnv + '%'); dn.set(dnv); stt.set(dnv === 0 ? '放開' : dnv >= 50 ? '重壓' : '按下'); barFill.style.width = dnv + '%';
     } };
   })();
@@ -243,10 +250,10 @@
             h('button', { class: 'pill', type: 'button', text: '偏航歸零', onclick: () => api.resetYaw(0) }),
             h('button', { class: 'pill', type: 'button', text: '主機放平', onclick: () => { sim.hand.pitch = 0; sim.hand.roll = 0; pitch.i.value = 0; roll.i.value = 0; } })),
           h('div', { class: 'ctl', style: 'font-weight:600;color:#7b8196' }, '「偏航」會真的把車子轉過去；俯仰、滾動是把主機抬起來傾斜（車子仍在地上）。方向正負號與「朝上的面」對照官方尚未用真機驗證。'))),
-      tryList(['拖「偏航」：車子在場地上跟著轉，偏航角和 Python 的 tilt_angles()[0]（逆時針為正、單位 0.1 度）一起變。', '按「偏航歸零」，再拖偏航，角度從 0 重新算。', '拖「俯仰」「滾動」：傾斜方向、朝上的面會變。', '按「搖晃」「輕拍」「自由落體」：手勢會顯示約 1 秒。', '放入範例，執行後傾斜主機或搖晃：向前傾斜亮起向上箭頭、搖晃會嗶一聲。']),
-      examples('陀螺儀', () => [B('sp_when_tilt', { DIR: 'forward' }, null, B('sp_light_image', { IMG: '27' })), B('sp_when_gesture', { G: 'shaken' }, null, B('sp_beep', null, { NOTE: N(72), S: N(0.3) })),
-        B('sp_start', null, null, chain(B('sp_reset_yaw'), B('sp_forever', null, { DO: { block: chain(B('sp_say', null, { T: { block: B('sp_yaw') } }), B('sp_wait', null, { S: N(0.5) })) } })))],
-        PY_HEAD + 'async def main():\n    motion_sensor.reset_yaw(0)\n    while True:\n        yaw, pitch, roll = motion_sensor.tilt_angles()   # 單位 0.1 度\n        print("偏航", yaw // 10, "俯仰", pitch // 10, "滾動", roll // 10)\n        if motion_sensor.gesture() == motion_sensor.SHAKEN:\n            await sound.beep(1047, 300, 100)\n        await runloop.sleep_ms(500)\n\nrunloop.run(main())\n'));
+      tryList(['01 認識：使用陀螺儀（動作）感測器。', '02 主機裡面有內建的陀螺儀，能感覺到移動和傾斜。', '03 做程式：「當 主機傾斜 向右」接「播放聲音」（官方是「Cat Meow 1」音效，模擬器沒有音效檔，改用嗶聲）。', '04 按執行。', '05 把主機向右傾斜，聽聲音（這裡拖「滾動」往右）。', '06 把程式改成主機向左傾斜時發出聲音。', '07 再按執行，測試聲音。'],
+        ['拖「偏航」：車子在場地上跟著轉，偏航角和 Python 的 tilt_angles()[0]（單位 0.1 度）一起變。', '按「搖晃」「輕拍」「自由落體」：手勢顯示約 1 秒。']),
+      examples('陀螺儀（官方第 6 課）', () => [B('sp_when_tilt', { DIR: 'right' }, null, B('sp_beep', null, { NOTE: N(72), S: N(0.3) }))],
+        PY_HEAD + 'async def main():\n    while True:\n        yaw, pitch, roll = motion_sensor.tilt_angles()   # 單位 0.1 度\n        if roll > 150:                                    # 向右傾斜 15 度以上（正負號未用真機驗證）\n            await sound.beep(1047, 300, 100)\n        await runloop.sleep_ms(50)\n\nrunloop.run(main())\n'));
     benches.gyro = { root, tick() {
       const y = sim.yaw(); yw.set(y); pt.set(Math.round(sim.hand.pitch)); rl.set(Math.round(sim.hand.roll));
       face.set(FACE[api.upFace()]); tp.set(sim.hand.taps);
@@ -265,7 +272,7 @@
     document.querySelectorAll('#stepper button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
     $('tab-field').hidden = tab !== 'field';
     for (const [k, b] of Object.entries(benches)) b.root.hidden = k !== tab;
-    active = benches[tab] || null; if (active) active.tick();
+    active = benches[tab] || null; if (active) { if (active.onShow) active.onShow(); active.tick(); }
     if (tab !== 'field' && SP.car3d) SP.car3d.stop && 0;      // 3D 繼續跑沒關係
   }
   document.querySelectorAll('#stepper button').forEach((b) => { b.onclick = () => showTab(b.dataset.tab); });

@@ -177,7 +177,7 @@ function frame() {
   const w = host.clientWidth, h = host.clientHeight;
   if (w && h && (w !== lastW || h !== lastH)) { lastW = w; lastH = h; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
   // 車子：位置與方向
-  rig.position.set(sim.x - 150, 0, sim.y - 100); rig.rotation.y = -sim.th;
+  rig.position.set(sim.x - 150, sim.lifted ? 3 : 0, sim.y - 100); rig.rotation.y = -sim.th;      // 架起來：車子離地 3 公分，輪子照樣轉
   // 輪子：馬達編碼器的度數（正＝車子往前）→ 繞車軸轉動
   wheelL.rotation.x = -sim.mL.deg * Math.PI / 180; wheelR.rotation.x = -sim.mR.deg * Math.PI / 180;
   // 場地改了（貼色紙、換場景）就更新地板；軌跡有變就更新（最多每 0.2 秒一次）

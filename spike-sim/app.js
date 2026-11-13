@@ -325,7 +325,7 @@
   const errs = [];
   const SENSOR_TYPE = {
     sp_color_is: 'color', sp_color: 'color', sp_reflect_is: 'color', sp_light: 'color', sp_when_color: 'color',
-    sp_dist: 'distance', sp_dist_is: 'distance', sp_dist_less: 'distance', sp_when_dist: 'distance',
+    sp_dist: 'distance', sp_dist_is: 'distance', sp_dist_less: 'distance', sp_when_dist: 'distance', sp_dist_light: 'distance',
     sp_force: 'force', sp_pressed_is: 'force', sp_force_val: 'force', sp_when_force: 'force',
   };
   const MOTOR_TYPES = new Set(['sp_motor_run', 'sp_motor_goto', 'sp_motor_start', 'sp_motor_stop', 'sp_motor_speed_set', 'sp_motor_pos', 'sp_motor_speed', 'sp_motor_relpos', 'sp_motor_setrel', 'sp_motor_turn']);
@@ -519,4 +519,11 @@
   buildHome(saved);
   window.addEventListener('resize', () => Blockly.svgResize(ws));
   SP.ws = ws; SP.sim = sim; SP.run = runProgram;
+  SP.ui = {      // 給 bench.js（機構單獨測試面板）用
+    sim, api, ws, say, setMode, autosave, pySrc, POWER_CSS,
+    isRunning: () => running, isPyDirty: () => pyDirty,
+    loadPython(code) { pySrc.value = code; pyDirty = true; $('py-note').textContent = '已放入範例（不會變回積木）'; setMode('python'); updateGutter(); autosave(); },
+    refreshPortSelects() { for (const p of ['C', 'D', 'E', 'F']) if (portEl[p + 'sel']) portEl[p + 'sel'].value = sim.ports[p]; autosave(); },
+  };
+  if (SP.onUiReady) SP.onUiReady();
 })(window.SP = window.SP || {});
