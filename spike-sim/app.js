@@ -183,7 +183,7 @@
   }
   function start3d() {
     const note = $('v3note');
-    const go = () => { SP.car3d.start($('three-host')); note.textContent = '示意模型（尺寸依模擬器：輪徑 5.6 公分、輪距 11.2 公分），不是官方三視圖。程式跑起來輪子會跟著轉。'; };
+    const go = () => { SP.car3d.start($('three-host')); note.textContent = '這是簡化的小車模型（輪子直徑 5.6 公分、兩輪相距 11.2 公分），和真的積木車長得不完全一樣。程式跑起來輪子會跟著轉。'; };
     if (SP.car3d) { go(); return; }
     note.textContent = '正在載入 3D 模組…';
     const t = setTimeout(() => { if (!SP.car3d) note.textContent = location.protocol === 'file:' ? '3D 預覽需要用網址開啟：瀏覽器不允許「雙擊檔案開啟」載入 3D 模組。請改用線上網址，或在資料夾裡開一個本機網頁伺服器。' : '3D 模組載入失敗（需要網路連到 cdn.jsdelivr.net）。'; }, location.protocol === 'file:' ? 1500 : 12000);

@@ -29,7 +29,7 @@
   const ro = (label) => { const b = h('b', { text: '—' }); return { el: h('div', { class: 'ro' }, h('span', { text: label }), b), set: (v) => { if (b.textContent !== String(v)) b.textContent = v; } }; };
   const hint = (t) => { U.say(t); };
   const guard = (fn) => {           // 面板上的動作：程式正在跑時不搶著控制
-    if (U.isRunning()) { hint('程式正在執行，請先按右下角的停止，再用這裡的按鈕。'); return; }
+    if (U.isRunning()) { hint('程式正在執行，請先按右下角的停止，再用這裡的按鈕喔。'); return; }
     sim.aborted = false;
     try { const r = fn(); if (r && r.catch) r.catch(() => {}); } catch (e) { hint(e.message); }
   };
@@ -42,8 +42,8 @@
       tick() { const c = find(); if (c && sel.value !== c && document.activeElement !== sel) sel.value = c; } };
   }
   const tryList = (official, extra) => h('div', { class: 'try' },
-    h('b', { text: '照官方教學的順序操作（意譯，官方原文是英文）' }), h('ol', {}, official.map((t) => h('li', { text: t }))),
-    extra && extra.length ? [h('b', { text: '多試試（我自己加的，不是官方步驟）' }), h('ul', {}, extra.map((t) => h('li', { text: t })))] : null);
+    h('b', { text: '跟著做一做' }), h('ol', {}, official.map((t) => h('li', { text: t }))),
+    extra && extra.length ? [h('b', { text: '再玩玩看' }), h('ul', {}, extra.map((t) => h('li', { text: t })))] : null);
   const N = (x) => ({ shadow: { type: 'math_number', fields: { NUM: x } } });
   const T = (s) => ({ shadow: { type: 'text', fields: { TEXT: s } } });
   const B = (type, fields, inputs, next) => ({ type, ...(fields ? { fields } : {}), ...(inputs ? { inputs } : {}), ...(next ? { next: { block: next } } : {}) });
@@ -92,9 +92,9 @@
           h('div', { class: 'ctl' }, '寫入 ', txt, h('button', { class: 'pill', type: 'button', text: '寫入', onclick: () => api.lightText(txt.value) })),
           h('div', { class: 'ctl' }, '電源鍵燈'), h('div', { class: 'swatches' }, sw),
           h('div', { class: 'readouts' }, state.el, btns.el))),
-      tryList(['01 認識：在主機上顯示一張笑臉。', '02 做程式：把「當程式開始」放上去，下面接「亮起 圖案」（官方積木叫 turn on）。', '03 按執行（播放）鈕，測試程式。', '04 主機顯示笑臉。', '05 把燈的圖案改成另一個圖案。', '06 再按一次執行，看新的燈光圖案。'],
-        ['直接點燈陣上的格子，一顆一顆亮起來。', '拖動「亮度」、按「順時針」旋轉燈陣；按電源鍵燈的顏色。', '按住「左」「右」按鈕，程式用「當 左 按鈕 被按下」就接得到。']),
-      examples('母體燈（官方第 1 課）', () => [B('sp_start', null, null, B('sp_light_image', { IMG: '3' }))],
+      tryList(['看看主機：它可以在 5×5 的小燈上顯示一張笑臉。', '做程式：拿一個「當程式開始」，下面接「亮起 圖案」，選一張笑臉。', '按右下角綠色的執行鈕。', '看，主機亮出笑臉了！', '把圖案換成另一個，例如難過的臉。', '再按一次執行，看新的圖案。'],
+        ['直接點小燈陣上的格子，自己畫一個圖案。', '拖動「亮度」讓燈變亮或變暗，按「順時針」把圖案轉個方向；也可以換電源鍵的燈色。', '按住「左」「右」按鈕：程式裡的「當 左 按鈕 被按下」就會動起來。']),
+      examples('母體燈', () => [B('sp_start', null, null, B('sp_light_image', { IMG: '3' }))],
         PY_HEAD + 'async def main():\n    light_matrix.show_image(light_matrix.IMAGE_HAPPY)\n\nrunloop.run(main())\n'));
     benches.hub = { root, tick() {
       const r = sim.matrixRot;
@@ -136,9 +136,9 @@
           h('div', { class: 'ctl' }, '轉到位置 ', goSel, bt('最短路徑', () => api.motorGoto(sel.value, 'short', goSel.value)), bt('順時針', () => api.motorGoto(sel.value, 'cw', goSel.value)), bt('逆時針', () => api.motorGoto(sel.value, 'ccw', goSel.value))),
           h('div', { class: 'ctl' }, bt('開始轉動', () => api.motorStartDir(sel.value, 1)), h('button', { class: 'pill', type: 'button', text: '停止馬達', onclick: () => { stopAll(); } }), h('button', { class: 'pill', type: 'button', text: '相對位置歸零', onclick: () => api.motorSetPos(sel.value, 0) })),
           h('label', { class: 'chk' }, lift, '把車子架起來（輪子懸空，車子不會移動；才能用滑鼠轉動轉盤）'))),
-      tryList(['01 認識：讓馬達轉起來。', '02 把馬達插在 A 埠（本模擬器 A 是左輪馬達）。', '03 做程式：「當程式開始」→「設定速度為 75%」→「A 轉動 ↻ 1 圈」。', '04 按執行，測試讓馬達轉動的程式。', '05 馬達在轉。', '06 把速度數字改大，馬達會轉得更快。', '07 再按一次執行，看馬達變快。'],
-        ['勾選「把車子架起來」，這樣只有馬達在轉、車子不會跑走。', '選「270°」按「最短路徑」「順時針」「逆時針」，看它走哪個方向。', '用滑鼠拖轉盤，像用手轉馬達：位置會跟著變。', '取消「架起來」再轉一次：單顆輪子轉＝車子繞另一顆輪子轉。']),
-      examples('馬達（官方第 2 課）', () => [B('sp_start', null, null, chain(B('sp_motor_speed_set', { PORT: 'A' }, { P: N(75) }), B('sp_motor_run', { PORT: 'A', DIR: '1', UNIT: 'rot' }, { N: N(1) })))],
+      tryList(['看看馬達：它可以一直轉，也可以轉到指定的位置。', '馬達接在 A 埠（A 是車子的左輪）。', '做程式：「當程式開始」→「設定速度為 75%」→「A 轉動 順時針 1 圈」。', '按執行，看馬達轉一圈。', '馬達轉起來了！', '把速度的數字改大，馬達會轉得更快。', '再按一次執行，比一比有沒有變快。'],
+        ['勾選「把車子架起來」：只有輪子在轉，車子不會跑走。', '選一個位置，按「最短路徑」「順時針」「逆時針」，看馬達怎麼走到那裡。', '用滑鼠拖轉盤，就像用手轉馬達，位置會跟著變。', '取消「架起來」再轉一次：只有一個輪子轉，車子會繞著另一個輪子轉圈。']),
+      examples('馬達', () => [B('sp_start', null, null, chain(B('sp_motor_speed_set', { PORT: 'A' }, { P: N(75) }), B('sp_motor_run', { PORT: 'A', DIR: '1', UNIT: 'rot' }, { N: N(1) })))],
         PY_HEAD + 'async def main():\n    await motor.run_for_degrees(port.A, 360, 750)\n\nrunloop.run(main())\n'));
     benches.motor = { root, tick() {
       const d = m().deg; needle.setAttribute('transform', `rotate(${((d % 360) + 360) % 360} 70 70)`);
@@ -156,15 +156,15 @@
     const field = h('button', { class: 'card-chip', type: 'button', 'data-c': '', onclick: () => { sim.hand.color = null; } }, '放開（看車子底下）');
     const led = S('circle', { cx: 60, cy: 74, r: 14, fill: '#999', stroke: '#222', 'stroke-width': 3 });
     const art = S('svg', { viewBox: '0 0 120 110', width: 150, height: 130 }, S('rect', { x: 18, y: 14, width: 84, height: 62, rx: 8, fill: '#fff', stroke: '#222', 'stroke-width': 3 }), S('rect', { x: 18, y: 14, width: 18, height: 62, rx: 6, fill: '#26282c' }), S('circle', { cx: 66, cy: 45, r: 20, fill: '#26282c' }), S('circle', { cx: 66, cy: 45, r: 12, fill: '#4a4d55' }), S('rect', { x: 40, y: 86, width: 40, height: 10, rx: 3, fill: '#d9dce0' }), led);
-    const nm = ro('顏色'), no = ro('官方編號'), lt = ro('反射光 %'), rg = ro('R G B 強度');
+    const nm = ro('顏色'), no = ro('顏色編號'), lt = ro('反射光 %'), rg = ro('R G B 強度');
     const root = h('section', { class: 'card bench', hidden: true },
       head('3', '顏色感測器', '辨色、反射光', port.el),
       h('div', { class: 'bench-body' }, h('div', { class: 'bench-art' }, art),
         h('div', { style: 'display:flex;flex-direction:column;gap:8px' }, h('div', { class: 'readouts' }, nm.el, no.el, lt.el, rg.el),
           h('div', { class: 'ctl' }, '拿色卡放在感測器前面：'), h('div', { class: 'ctl' }, chips, none, field))),
-      tryList(['01 認識：使用顏色感測器。', '02 把顏色感測器插上（官方插 A 埠；本模擬器 A、B 是輪子，感測器接在 C～F 其中一埠）。', '03 做程式：「當 顏色是 紅色」接「亮起 圖案」，用感測器點亮主機。', '04 按執行。', '05 拿一塊紅色積木放在感測器前面，看主機亮起來（這裡按「紅色」色卡）。', '06 把積木上的顏色從紅色改成黃色，感測器就會對黃色積木有反應。', '07 再按執行，拿黃色積木測試（按「黃色」色卡）。'],
-        ['按「黑色」「白色」，看反射光百分比怎麼變。', '按「沒有東西」：顏色是 −1。', '按「放開」，到「整車場地」選「顏色區」，把車子拖到各色方塊上看讀值。']),
-      examples('顏色感測器（官方第 3 課）', () => [B('sp_when_color', { PORT: 'C', COLOR: 'red' }, null, B('sp_light_image', { IMG: '3' }))],
+      tryList(['看看顏色感測器：它能認出面前東西的顏色。', '把顏色感測器接上（A、B 是車子的輪子，感測器請接在 C～F 其中一個埠）。', '做程式：「當 顏色是 紅色」→「亮起 圖案」，讓主機跟著感測器亮起來。', '按執行。', '拿一塊紅色積木放在感測器前面（按下面的「紅色」色卡），看主機亮起來。', '把積木上的紅色改成黃色，感測器就會認黃色的積木。', '再按一次執行，換「黃色」色卡試試看。'],
+        ['按「黑色」「白色」，看「反射光」的百分比怎麼變。', '按「沒有東西」，看感測器讀到什麼。', '按「放開」，再到「整車場地」選「顏色區」，把車子拖到不同顏色的方塊上，看它讀到什麼顏色。']),
+      examples('顏色感測器', () => [B('sp_when_color', { PORT: 'C', COLOR: 'red' }, null, B('sp_light_image', { IMG: '3' }))],
         PY_HEAD + 'async def main():\n    while True:\n        if color_sensor.color(port.C) == color.RED:\n            light_matrix.show_image(light_matrix.IMAGE_HAPPY)\n        else:\n            light_matrix.clear()\n        await runloop.sleep_ms(50)\n\nrunloop.run(main())\n'));
     benches.color = { root, onShow() { port.connect(); }, tick() {
       port.tick(); const c = sim.color(), [r, g, b] = sim.pixel(), k = 1024 / 255;
@@ -192,9 +192,9 @@
         h('div', { style: 'display:flex;flex-direction:column;gap:8px' }, h('div', { class: 'readouts' }, cm.el, inch.el, pc.el, mm.el),
           h('div', { class: 'ctl' }, h('label', { class: 'chk' }, use, '用手放一個物體在前面：'), sl, slv), bar,
           h('div', { class: 'ctl' }, '感測器的 4 顆燈 ', h('div', { class: 'dots' }, dots), lightBtn('全亮', [100, 100, 100, 100]), lightBtn('左眼', [100, 100, 0, 0]), lightBtn('右眼', [0, 0, 100, 100]), lightBtn('關閉', [0, 0, 0, 0])))),
-      tryList(['01 認識：使用距離感測器。', '02 把距離感測器插上（本模擬器接在 C～F 其中一埠）。', '03 做程式：「當 距離 更近於 20 %」接「播放嗶聲 60 持續 0.2 秒」，讓主機嗶一聲。', '04 按執行。', '05 把手放在感測器前面，聽主機嗶一聲（這裡勾選「用手放一個物體」並把距離拉近）。', '06 把積木上的距離數字改大一點，感測器從更遠的地方就會有反應。', '07 再按執行，把手放在感測器前面。'],
-        ['拉到 15 公分以下，看公分、英寸、百分比一起變；200 公分以上＝沒偵測到，Python 回 −1。', '按「全亮」「左眼」「右眼」看感測器的燈（官方積木「距離感測器燈」）。', '取消勾選改用「整車場地」：車子朝牆走，距離就是到牆的距離。']),
-      examples('距離感測器（官方第 4 課）', () => [B('sp_when_dist', { PORT: 'D', OP: '<' }, { N: N(20) }, B('sp_beep', null, { NOTE: N(60), S: N(0.2) }))],
+      tryList(['看看距離感測器：它能量出前面的東西有多遠。', '把距離感測器接上（請接在 C～F 其中一個埠）。', '做程式：「當 距離 更近於 20 %」→「播放嗶聲 60 持續 0.2 秒」，讓主機嗶一聲。', '按執行。', '把手放在感測器前面（勾選「放一個東西在前面」並把距離拉近），聽主機嗶一聲。', '把積木上的距離數字改大一點，從更遠的地方就會嗶了。', '再按一次執行，把手放在感測器前面。'],
+        ['把距離拉到 15 公分以內，看公分、英寸、百分比一起變；超過 200 公分就偵測不到了。', '按「全亮」「左眼」「右眼」，看感測器上的小燈。', '取消勾選，改到「整車場地」：車子往牆走時，距離就是車子到牆的距離。']),
+      examples('距離感測器', () => [B('sp_when_dist', { PORT: 'D', OP: '<' }, { N: N(20) }, B('sp_beep', null, { NOTE: N(60), S: N(0.2) }))],
         PY_HEAD + 'async def main():\n    while True:\n        d = distance_sensor.distance(port.D)   # 毫米，沒偵測到是 -1\n        if 0 <= d < 200:\n            await sound.beep(262, 200, 100)\n            distance_sensor.show(port.D, [100, 100, 100, 100])\n        else:\n            distance_sensor.clear(port.D)\n        await runloop.sleep_ms(50)\n\nrunloop.run(main())\n'));
     benches.dist = { root, onShow() { port.connect(); }, tick() {
       port.tick(); const d = sim.distRaw(); cm.set(Math.round(d)); inch.set((d / 2.54).toFixed(1)); pc.set(Math.round(d / 2) + '%'); mm.set(sim.distanceMm());
@@ -222,9 +222,9 @@
       h('div', { class: 'bench-body' }, h('div', { class: 'bench-art' }, art, btn),
         h('div', { style: 'display:flex;flex-direction:column;gap:8px' }, h('div', { class: 'readouts' }, n.el, pc.el, stt.el, dn.el), bar,
           h('div', { class: 'ctl' }, '固定施力 ', sl, slv), h('div', { class: 'ctl', style: 'font-weight:600;color:#7b8196' }, '按下＝大於 0 牛頓；重壓＝5 牛頓以上；放開＝0。'))),
-      tryList(['01 認識：使用力傳感器。', '02 馬達插 A 埠、力傳感器插 B 埠（本模擬器 A 是輪子馬達，力傳感器接在 C～F 其中一埠）。', '03 做程式：「當 力傳感器 被按下」接「A 開始轉動」；「當 被放開」接「A 停止馬達」（停止積木是我從官方積木盤推測的接法）。', '04 按執行。', '05 按下力傳感器，讓馬達轉動（按黑色大按鈕）。'],
-        ['按得越久力越大，超過 5 牛頓叫「重壓」。', '拖「固定施力」到 3，再到 8，看狀態。', '到「整車場地」，車子往牆走撞到牆：前面的碰撞探針也會把它按下。']),
-      examples('力傳感器（官方第 5 課）', () => [B('sp_when_force', { PORT: 'E', STATE: 'down' }, null, B('sp_motor_start', { PORT: 'A', DIR: '1' })), B('sp_when_force', { PORT: 'E', STATE: 'up' }, null, B('sp_motor_stop', { PORT: 'A' }))],
+      tryList(['看看力傳感器：它知道你有沒有按它、按得多用力。', '馬達接 A 埠，力傳感器請接在 C～F 其中一個埠（A、B 是車子的輪子）。', '做程式：「當 力傳感器 被按下」→「A 開始轉動」；再加「當 被放開」→「A 停止馬達」。', '按執行。', '按下力傳感器（按住黑色大按鈕），馬達就會轉起來！'],
+        ['按得越久力越大，超過 5 牛頓就是「重壓」。', '拖「固定施力」到 3，再到 8，看看狀態怎麼變。', '到「整車場地」，讓車子往牆走：撞到牆的時候，前面的碰撞探針也會把它按下去。']),
+      examples('力傳感器', () => [B('sp_when_force', { PORT: 'E', STATE: 'down' }, null, B('sp_motor_start', { PORT: 'A', DIR: '1' })), B('sp_when_force', { PORT: 'E', STATE: 'up' }, null, B('sp_motor_stop', { PORT: 'A' }))],
         PY_HEAD + 'async def main():\n    while True:\n        if force_sensor.pressed(port.E):\n            motor.run(port.A, 500)\n        else:\n            motor.stop(port.A)\n        await runloop.sleep_ms(20)\n\nrunloop.run(main())\n'));
     benches.force = { root, onShow() { port.connect(); }, tick() {
       port.tick(); const dnv = sim.forceDeci(); n.set((dnv / 10).toFixed(1)); pc.set(dnv + '%'); dn.set(dnv); stt.set(dnv === 0 ? '放開' : dnv >= 50 ? '重壓' : '按下'); barFill.style.width = dnv + '%';
@@ -249,11 +249,11 @@
           h('div', { class: 'ctl' }, gbtn('搖晃', 'shaken'), gbtn('輕拍', 'tapped'), gbtn('自由落體', 'falling'),
             h('button', { class: 'pill', type: 'button', text: '偏航歸零', onclick: () => api.resetYaw(0) }),
             h('button', { class: 'pill', type: 'button', text: '主機放平', onclick: () => { sim.hand.pitch = 0; sim.hand.roll = 0; pitch.i.value = 0; roll.i.value = 0; } })),
-          h('div', { class: 'ctl', style: 'font-weight:600;color:#7b8196' }, '「偏航」會真的把車子轉過去；俯仰、滾動是把主機抬起來傾斜（車子仍在地上）。方向正負號與「朝上的面」對照官方尚未用真機驗證。'))),
-      tryList(['01 認識：使用陀螺儀（動作）感測器。', '02 主機裡面有內建的陀螺儀，能感覺到移動和傾斜。', '03 做程式：「當 主機傾斜 向右」接「播放聲音」（官方是「Cat Meow 1」音效，模擬器沒有音效檔，改用嗶聲）。', '04 按執行。', '05 把主機向右傾斜，聽聲音（這裡拖「滾動」往右）。', '06 把程式改成主機向左傾斜時發出聲音。', '07 再按執行，測試聲音。'],
-        ['拖「偏航」：車子在場地上跟著轉，偏航角和 Python 的 tilt_angles()[0]（單位 0.1 度）一起變。', '按「搖晃」「輕拍」「自由落體」：手勢顯示約 1 秒。']),
-      examples('陀螺儀（官方第 6 課）', () => [B('sp_when_tilt', { DIR: 'right' }, null, B('sp_beep', null, { NOTE: N(72), S: N(0.3) }))],
-        PY_HEAD + 'async def main():\n    while True:\n        yaw, pitch, roll = motion_sensor.tilt_angles()   # 單位 0.1 度\n        if roll > 150:                                    # 向右傾斜 15 度以上（正負號未用真機驗證）\n            await sound.beep(1047, 300, 100)\n        await runloop.sleep_ms(50)\n\nrunloop.run(main())\n'));
+          h('div', { class: 'ctl', style: 'font-weight:600;color:#7b8196' }, '「偏航」會真的把車子轉過去；俯仰、滾動是把主機抬起來傾斜（車子仍在地上）。'))),
+      tryList(['看看陀螺儀：主機裡面有它，能感覺到移動和傾斜。', '陀螺儀就在主機裡面，不用另外接線。', '做程式：「當 主機傾斜 向右」→「播放嗶聲」。', '按執行。', '把主機向右傾斜（把「滾動」往右拖），聽聲音。', '把程式改成向左傾斜時才發出聲音。', '再按一次執行，向左傾斜試試看。'],
+        ['拖「偏航」：車子會在場地上跟著轉，偏航角的數字也會一起變。', '按「搖晃」「輕拍」「自由落體」，看手勢顯示出來。']),
+      examples('陀螺儀', () => [B('sp_when_tilt', { DIR: 'right' }, null, B('sp_beep', null, { NOTE: N(72), S: N(0.3) }))],
+        PY_HEAD + 'async def main():\n    while True:\n        yaw, pitch, roll = motion_sensor.tilt_angles()   # 單位 0.1 度\n        if roll > 150:                                    # 向右傾斜 15 度以上\n            await sound.beep(1047, 300, 100)\n        await runloop.sleep_ms(50)\n\nrunloop.run(main())\n'));
     benches.gyro = { root, tick() {
       const y = sim.yaw(); yw.set(y); pt.set(Math.round(sim.hand.pitch)); rl.set(Math.round(sim.hand.roll));
       face.set(FACE[api.upFace()]); tp.set(sim.hand.taps);
@@ -285,7 +285,7 @@
   setInterval(() => {
     const t = []; if (sim.hand.color) t.push('色卡：' + COLOR_ZH[sim.hand.color]); if (sim.hand.dist !== null) t.push('手放在前面 ' + Math.round(sim.hand.dist) + ' 公分');
     if (sim.hand.force !== null) t.push('手按力感測器 ' + sim.hand.force.toFixed(1) + ' 牛頓'); if (sim.hand.pitch || sim.hand.roll) t.push('主機傾斜'); if (sim.lifted) t.push('車子被架起來');
-    note.hidden = noteBtn.hidden = !t.length; note.textContent = '手動介入中：' + t.join('、');
+    note.hidden = noteBtn.hidden = !t.length; note.textContent = '你正在用手控制：' + t.join('、');
   }, 250);
   SP.bench = { showTab };
 })(window.SP = window.SP || {});
