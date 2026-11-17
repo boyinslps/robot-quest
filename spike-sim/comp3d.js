@@ -26,7 +26,7 @@
   function loadModel(file) {
     if (!cache[file]) cache[file] = new Promise((res, rej) => {
       loader.parse('1 15 0 0 0 1 0 0 0 1 0 0 0 1 ' + file, (g) => {
-        g.scale.set(0.4, -0.4, 0.4);
+        g.scale.set(0.4, 0.4, 0.4); g.rotation.x = Math.PI;      // 繞 X 軸轉 180 度（只取負 Y 會變成鏡像、字母會反）
         const w = new T.Group(); w.add(g);
         const b = new T.Box3().setFromObject(w), c = b.getCenter(new T.Vector3()); g.position.sub(c);
         const bb = new T.Box3().setFromObject(w), size = bb.getSize(new T.Vector3());
@@ -105,7 +105,7 @@
     const L = ledTexture(); let lsig = '';
     const hits = {};
     loadModel('45601c01.dat').then((m) => {
-      const body = new T.Group(); body.rotation.y = Math.PI; body.add(m); tilt.add(body);   // 大按鈕那一端朝向畫面下方，和官方主機俯視圖一樣
+      const body = new T.Group(); body.add(m); tilt.add(body);   // 大按鈕那一端朝向畫面下方（+Z），和官方主機俯視圖一樣
       const top = m.userData.size.y / 2;
       const plane = new T.Mesh(new T.PlaneGeometry(56, 88), new T.MeshBasicMaterial({ map: L.tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
       plane.rotation.x = -Math.PI / 2; plane.position.y = top + 0.25; tilt.add(plane);
@@ -161,7 +161,7 @@
     const m = () => sim.mot[p];
     const f = frame('馬達', '#0090f5', p, '用滑鼠在藍色圓盤上拖，就像用手轉馬達。拖空白處＝轉視角、滾輪＝縮放。');
     const title = f.root.querySelector('.part-h').firstChild.nextSibling;
-    const v = makeView(f, { cam: [70, 85, 65], target: [0, 4, -8] }); if (!v) return null;
+    const v = makeView(f, { cam: [70, 85, 65], target: [0, 4, 8] }); if (!v) return null;
     f.chip('pos', '位置'); f.chip('turn', '共轉'); f.chip('v', '轉速');
     const rotor = new T.Group(); let rotorHit = null;
     const tx = (() => { // 圓盤貼圖：4 個圓孔、中心十字孔、黑色指示線
@@ -177,8 +177,8 @@
       const top = model.userData.size.y / 2;
       // 圓盤中心：模型座標 (0, 頂面, -24.2)，半徑 11.6 公釐
       const disc = new T.Mesh(new T.CircleGeometry(11.7, 48), new T.MeshStandardMaterial({ map: tx, roughness: 0.5 }));
-      disc.rotation.x = -Math.PI / 2; disc.position.y = 0.2; rotor.add(disc); rotor.position.set(0, top + 0.1, -24.2); v.scene.add(rotor); rotorHit = disc;
-      const o = new T.Mesh(new T.RingGeometry(1.2, 1.9, 24), new T.MeshBasicMaterial({ color: 0x111111, side: T.DoubleSide })); o.rotation.x = -Math.PI / 2; o.position.set(14.8, top + 0.12, -24.2 + 3); v.scene.add(o);
+      disc.rotation.x = -Math.PI / 2; disc.position.y = 0.2; rotor.add(disc); rotor.position.set(0, top + 0.1, 24.2); v.scene.add(rotor); rotorHit = disc;
+      const o = new T.Mesh(new T.RingGeometry(1.2, 1.9, 24), new T.MeshBasicMaterial({ color: 0x111111, side: T.DoubleSide })); o.rotation.x = -Math.PI / 2; o.position.set(14.8, top + 0.12, 24.2 - 3); v.scene.add(o);
       v.ready();
     });
     let last = null;
@@ -187,7 +187,7 @@
     v.hooks.move = (e) => { const a = ang(e); let d = a - last; if (d > 180) d -= 360; if (d < -180) d += 360; m().deg += d; m().cur = 0; last = a; };
     v.hooks.up = () => { last = null; };
     return { id: 'motor:' + p, root: f.root, destroy: v.destroy, tick() {
-      title.textContent = p === sim.pairL ? '馬達（左輪）' : p === sim.pairR ? '馬達（右輪）' : '馬達';
+      title.textContent = '馬達';
       const ok = sim.ports[p] === 'motor'; f.root.classList.toggle('warn', !ok);
       const d = m().deg; rotor.rotation.y = -rad(d);
       if (!ok) { f.chips.pos(sim.ports[p] === 'none' ? '這個埠沒有接馬達' : '這個埠接的不是馬達'); f.chips.turn('—'); f.chips.v('—'); } else { f.chips.pos(((Math.round(d) % 360) + 360) % 360 + '°'); f.chips.turn((d / 360).toFixed(2) + ' 圈'); f.chips.v(Math.round(m().cur || 0) + '°/秒'); }
@@ -204,22 +204,22 @@
   }
   function colorPane(port) {
     const f = frame('顏色感測器', '#34ccf1', port, '點一塊色塊，它會移到鏡頭前面；再點一次就拿開。拖空白處＝轉視角。');
-    const v = makeView(f, { cam: [70, 45, -120], target: [20, -2, -20] }); if (!v) return null;
+    const v = makeView(f, { cam: [70, 45, 120], target: [20, -2, 20] }); if (!v) return null;
     f.chip('c', '看到'); f.chip('l', '反射光');
     const order = ['red', 'yellow', 'green', 'blue', 'black', 'white'], bricks = {};
     const floorY = -11.6;
     let lens = null;
     loadModel('37308.dat').then((model) => {
       v.scene.add(model);
-      lens = new T.Mesh(new T.CircleGeometry(4.2, 24), new T.MeshBasicMaterial({ color: 0x9aa0a6 })); lens.position.set(0, 0, -11.9); lens.rotation.y = Math.PI; v.scene.add(lens);
+      lens = new T.Mesh(new T.CircleGeometry(4.2, 24), new T.MeshBasicMaterial({ color: 0x9aa0a6 })); lens.position.set(0, 0, 11.9); v.scene.add(lens);
       v.ready();
     });
     const floor = new T.Mesh(new T.PlaneGeometry(400, 400), new T.MeshStandardMaterial({ color: 0xdfe5ee, roughness: 1 })); floor.rotation.x = -Math.PI / 2; floor.position.y = floorY - 0.05; v.scene.add(floor);
     order.forEach((c, i) => {
-      const b = brickMesh(c); b.userData.c = c; const home = new T.Vector3(46 + (i % 2) * 38, floorY + 4.8, -(i >> 1) * 22 - 6);
+      const b = brickMesh(c); b.userData.c = c; const home = new T.Vector3(46 + (i % 2) * 38, floorY + 4.8, (i >> 1) * 22 + 6);
       b.position.copy(home); v.scene.add(b); bricks[c] = { c, m: b, home, tgt: home.clone(), rot: 0 };
     });
-    const front = new T.Vector3(0, 0, -11.8 - 4 - 1.8 - 4.8);
+    const front = new T.Vector3(0, 0, 11.8 + 4 + 1.8 + 4.8);
     v.hooks.down = (e) => { const hs = v.pick(e, order.map((c) => bricks[c].m)); if (!hs.length) return false; let o = hs[0].object; while (o && !o.userData.c) o = o.parent; if (!o) return false; const c = o.userData.c; state.brick = state.brick === c ? null : c; return true; };
     v.hooks.up = () => {};
     const okType = () => sim.ports[port] === 'color';
@@ -228,7 +228,7 @@
       for (const c of order) {
         const b = bricks[c], sel = state.brick === c, tgt = sel ? front : b.home;
         b.m.position.lerp(tgt, 0.2);
-        const want = sel ? Math.PI / 2 : 0; b.rot += (want - b.rot) * 0.2; b.m.rotation.x = b.rot;
+        const want = sel ? -Math.PI / 2 : 0; b.rot += (want - b.rot) * 0.2; b.m.rotation.x = b.rot;
         if (sel) b.m.position.y += (0 - b.m.position.y) * 0.05;
       }
       const seen = state.brick || 'none';
@@ -242,28 +242,28 @@
   /* ---------- 距離感測器：拖動前面的灰色物體 ---------- */
   function distPane(port) {
     const f = frame('距離感測器', '#34ccf1', port, '拖動前面的灰色物體，看距離怎麼變；拖到最遠就是拿開。拖空白處＝轉視角。');
-    const v = makeView(f, { cam: [250, 90, -120], target: [0, 0, -120] }); if (!v) return null;
+    const v = makeView(f, { cam: [380, 120, 115], target: [0, 0, 115] }); if (!v) return null;
     f.chip('d', '距離'); f.chip('p', '百分比');
-    const floorY = -11.6, Z0 = -15.8 - 8, PZ = 1.1;                 // 0 公分的位置；每公分幾公釐
+    const floorY = -11.6, Z0 = 15.8 + 8, PZ = 1.1;                 // 0 公分的位置；每公分幾公釐
     const floor = new T.Mesh(new T.PlaneGeometry(500, 500), new T.MeshStandardMaterial({ color: 0xdfe5ee, roughness: 1 })); floor.rotation.x = -Math.PI / 2; floor.position.y = floorY - 0.05; v.scene.add(floor);
-    for (let cm = 0; cm <= 200; cm += 10) { const t = new T.Mesh(new T.BoxGeometry(cm % 50 === 0 ? 40 : 22, 0.3, 0.8), new T.MeshBasicMaterial({ color: cm % 50 === 0 ? 0x64748b : 0x9aa5bd })); t.position.set(0, floorY, Z0 - cm * PZ); v.scene.add(t); }
+    for (let cm = 0; cm <= 200; cm += 10) { const t = new T.Mesh(new T.BoxGeometry(cm % 50 === 0 ? 40 : 22, 0.3, 0.8), new T.MeshBasicMaterial({ color: cm % 50 === 0 ? 0x64748b : 0x9aa5bd })); t.position.set(0, floorY, Z0 + cm * PZ); v.scene.add(t); }
     const obj = new T.Mesh(new T.BoxGeometry(46, 40, 8), mat(0x8d94a6)); v.scene.add(obj);
     const beam = new T.Mesh(new T.BoxGeometry(30, 14, 1), new T.MeshBasicMaterial({ color: 0x9fe0f5, transparent: true, opacity: 0.35 })); v.scene.add(beam);
     const dots = [];
     loadModel('37316.dat').then((model) => {
       v.scene.add(model);
-      for (const [x, y] of [[-20.4, 0], [-11.6, 0], [11.6, 0], [20.4, 0]]) { const d = new T.Mesh(new T.CircleGeometry(1.8, 12), new T.MeshBasicMaterial({ color: 0x444444 })); d.position.set(x, 8.5 + y, -15.9); d.rotation.y = Math.PI; v.scene.add(d); dots.push(d); }
+      for (const [x, y] of [[-20.4, 0], [-11.6, 0], [11.6, 0], [20.4, 0]]) { const d = new T.Mesh(new T.CircleGeometry(1.8, 12), new T.MeshBasicMaterial({ color: 0x444444 })); d.position.set(x, 8.5 + y, 15.9); v.scene.add(d); dots.push(d); }
       v.ready();
     });
-    const zOf = (d) => Z0 - d * PZ - 4;
-    const dOf = (z) => (Z0 - 4 - z) / PZ;
+    const zOf = (d) => Z0 + d * PZ + 4;
+    const dOf = (z) => (z - Z0 - 4) / PZ;
     v.hooks.down = (e) => { if (!v.pick(e, [obj]).length) return false; return true; };
     v.hooks.move = (e) => { const p = v.planeHit(e, 0); if (p) state.dist = clamp(dOf(p.z), 0, 200); };
     v.hooks.up = () => { if (state.dist >= 196) state.dist = 200; };
     const okType = () => sim.ports[port] === 'distance';
     return { id: 'dist:' + port, root: f.root, destroy: v.destroy, tick() {
       const d = state.dist, none = d >= 200; obj.position.set(0, 0, zOf(d)); obj.material.opacity = none ? 0.35 : 1; obj.material.transparent = none;
-      beam.position.set(0, 0, (Z0 + zOf(d) + 4) / 2); beam.scale.set(1, 1, Math.abs(zOf(d) + 4 - Z0)); beam.material.opacity = none ? 0.12 : 0.35; beam.scale.z = Math.max(1, Math.abs(zOf(d) + 4 - Z0));
+      beam.position.set(0, 0, (Z0 + zOf(d) - 4) / 2); beam.scale.set(1, 1, Math.abs(zOf(d) - 4 - Z0)); beam.material.opacity = none ? 0.12 : 0.35; beam.scale.z = Math.max(1, Math.abs(zOf(d) - 4 - Z0));
       beam.geometry.dispose && 0;
       dots.forEach((dt, i) => { const val = sim.distLights[i] || 0; dt.material.color.set(val ? `rgb(${Math.round(60 + val * 1.9)},230,255)` : '#444'); });
       f.root.classList.toggle('warn', !okType());
@@ -275,7 +275,7 @@
   /* ---------- 力感測器：按住黑色按鈕，越久越用力 ---------- */
   function forcePane(port) {
     const f = frame('力傳感器', '#34ccf1', port, '用滑鼠按住感測器上方的黑色按鈕，按得越久越用力；放開就鬆開。拖空白處＝轉視角。');
-    const v = makeView(f, { cam: [60, 80, 70], target: [0, 0, 0] }); if (!v) return null;
+    const v = makeView(f, { cam: [80, 100, 100], target: [0, 8, 0] }); if (!v) return null;
     f.chip('n', '力'); f.chip('s', '狀態');
     let model = null, arrow = null;
     loadModel('37312.dat').then((m) => { model = m; v.scene.add(m); v.ready(); });

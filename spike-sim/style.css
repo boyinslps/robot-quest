@@ -339,3 +339,10 @@ body.has-lesson #tab-comp { min-height: min(640px, calc(100vh - 330px)); }
 .p3d-bar button:hover{background:#f1f5f9}
 
 .hubtop.noimg { background: #f3f5f9; border: 2px solid #c9cfdb; border-radius: 14px; }
+
+/* ===== 主機圖改用 LDraw 零件模型畫的俯視圖（assets/parts/render/hub-top.png，512×800，8 像素＝1 公釐）===== */
+.hubtop { max-width: 220px; aspect-ratio: 512 / 800; background: url(assets/parts/render/hub-top.png) 0 0 / 100% 100% no-repeat; }
+.hubtop .matrix { left: 18.75%; top: 30%; width: 62.5%; height: 40%; }
+.hubtop .hbtn { top: 78.5%; width: 17%; height: 7%; }
+.hubtop .hbtn.hl { left: 19.5%; } .hubtop .hbtn.hr { left: 63.5%; }
+.hubtop .hub-btn { left: 50%; top: 81.9%; width: 24%; }

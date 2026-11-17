@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="author" content="資訊老師黃博胤">
+<title>用 LDraw 零件模型產生 2D 圖（工具頁）</title>
+<script type="importmap">{ "imports": { "three": "../../vendor/three/three.module.js", "three/addons/": "../../vendor/three/addons/" } }</script>
+</head>
+<body>
+<pre id="log">產生中…</pre>
+<script type="module">
+/* 這個頁面把 LDraw 官方零件庫的模型（CC BY 4.0，LDraw.org）畫成透明背景的 PNG，供接口連接畫面與主機圖使用。
+   用法：開 render.html?save=埠號（本機有支援 POST 存檔的小伺服器時會自動存到 assets/parts/render/）。 */
+import * as THREE from 'three';
+import { LDrawLoader } from 'three/addons/loaders/LDrawLoader.js';
+const log = (s) => { document.getElementById('log').textContent += '\n' + s; };
+const man = await (await fetch('ldraw/manifest.json')).json();
+const map = {}; for (const [k, v] of Object.entries(man.files)) map[k] = v[0];
+const loader = new LDrawLoader(); loader.smoothNormals = true;
+loader.setPath('ldraw/'); loader.setPartsLibraryPath('ldraw/'); loader.setFileMap(map);
+await loader.preloadMaterials('LDConfig.ldr');
+const load = (file) => new Promise((res, rej) => loader.parse('1 15 0 0 0 1 0 0 0 1 0 0 0 1 ' + file, (g) => {
+  g.scale.set(0.4, 0.4, 0.4); g.rotation.x = Math.PI; const w = new THREE.Group(); w.add(g);
+  const b = new THREE.Box3().setFromObject(w), c = b.getCenter(new THREE.Vector3()); g.position.sub(c); res(w);
+}, rej));
+const savePort = new URLSearchParams(location.search).get('save');
+
+function shot(model, { w, h, dir, up = [0, 1, 0], ortho = null, fit = 1.0 }) {
+  const R = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+  R.setPixelRatio(1); R.setSize(w, h); R.setClearColor(0x000000, 0);
+  const scene = new THREE.Scene();
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x8a93a0, 1.7));
+  const d1 = new THREE.DirectionalLight(0xffffff, 2.2); d1.position.set(150, 300, 250); scene.add(d1);
+  const d2 = new THREE.DirectionalLight(0xffffff, 1.0); d2.position.set(-250, 100, -150); scene.add(d2);
+  scene.add(model); model.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(model), size = box.getSize(new THREE.Vector3()), center = box.getCenter(new THREE.Vector3());
+  const d = new THREE.Vector3(...dir).normalize();
+  const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 2000);
+  cam.up.set(...up); cam.position.copy(center).addScaledVector(d, 600); cam.lookAt(center); cam.updateMatrixWorld(true);
+  if (ortho) { cam.left = -ortho.w / 2; cam.right = ortho.w / 2; cam.top = ortho.h / 2; cam.bottom = -ortho.h / 2; }
+  else {
+    // 依模型的 8 個角在畫面上的範圍，自動縮放到剛好放進去
+    const inv = cam.matrixWorldInverse, pts = [];
+    for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) pts.push(new THREE.Vector3(x, y, z).applyMatrix4(inv));
+    const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y), cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+    let hw = (Math.max(...xs) - Math.min(...xs)) / 2 / fit, hh = (Math.max(...ys) - Math.min(...ys)) / 2 / fit;
+    const asp = w / h; if (hw / hh < asp) hw = hh * asp; else hh = hw / asp;
+    cam.left = cx - hw; cam.right = cx + hw; cam.top = cy + hh; cam.bottom = cy - hh;
+  }
+  cam.updateProjectionMatrix();
+  R.render(scene, cam);
+  const url = R.domElement.toDataURL('image/png'); R.dispose();
+  return url;
+}
+async function put(name, dataUrl) {
+  const img = document.createElement('img'); img.src = dataUrl; img.style.cssText = 'max-width:240px;background:#eee;margin:4px;border:1px solid #ccc'; document.body.append(img);
+  if (savePort) { const blob = await (await fetch(dataUrl)).blob(); await fetch('/save?name=' + name, { method: 'POST', body: blob }); log('已存 ' + name); }
+}
+// 主機：正上方，大按鈕那一端朝下（和官方主機俯視圖一樣）。8 像素＝1 公釐，上下左右各留 4 公釐
+{
+  const m = await load('45601c01.dat'); const g = new THREE.Group(); g.add(m);
+  await put('hub-top.png', shot(g, { w: 512, h: 800, dir: [0, 1, 0], up: [0, 0, -1], ortho: { w: 64, h: 100 } }));
+}
+for (const [name, file, dir] of [
+  ['motor.png', '54696.dat', [0.9, 0.85, 1.0]],
+  ['color.png', '37308.dat', [0.9, 0.55, 1.0]],
+  ['distance.png', '37316.dat', [0.9, 0.55, 1.0]],
+  ['force.png', '37312.dat', [0.9, 0.95, 1.0]],
+]) { const m = await load(file); await put(name, shot(m, { w: 480, h: 360, dir, fit: 0.88 })); }
+log('完成');
+</script>
+</body>
+</html>

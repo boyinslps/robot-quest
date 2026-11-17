@@ -9,14 +9,14 @@
   const S = (tag, attrs, ...kids) => { const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v); for (const k of kids.flat()) if (k != null) e.append(k); return e; };
   const ALL = ['A', 'B', 'C', 'D', 'E', 'F'];
   const ZH = { motor: '馬達', color: '顏色感測器', distance: '距離感測器', force: '力感測器' };
-  const IMG = { motor: 'assets/parts/img/motor-medium-iso.png', color: 'assets/parts/img/color-sensor-iso.png', distance: 'assets/parts/img/distance-sensor-iso.png', force: 'assets/parts/img/force-sensor-iso.png' };
-  const ASPECT = { motor: 424 / 400, color: 800 / 533, distance: 800 / 533, force: 600 / 347 };
+  const IMG = { motor: 'assets/parts/render/motor.png', color: 'assets/parts/render/color.png', distance: 'assets/parts/render/distance.png', force: 'assets/parts/render/force.png' };   // 用 LDraw 零件模型畫的圖（render.html）
+  const ASPECT = { motor: 480 / 360, color: 480 / 360, distance: 480 / 360, force: 480 / 360 };
 
-  const W = 900, HH = 580;
-  const HUB = { x: 225, y: 30, w: 450, h: 510 };               // 主機正上方圖（hub-top-blank.png 450×510）
+  const W = 900, HH = 740;
+  const HUB = { x: 225, y: 20, w: 450, h: 703 }, K = 450 / 512;   // 主機正上方圖（render/hub-top.png 512×800，8 像素＝1 公釐）
   // 接口位置（主機圖座標）：左邊 A、C、E，右邊 B、D、F；開口在長邊
   const SOCK = {};
-  [['A', 110, 195], ['C', 110, 261], ['E', 110, 327], ['B', 340, 195], ['D', 340, 261], ['F', 340, 327]].forEach(([p, x, y]) => { SOCK[p] = { x: HUB.x + x, y: HUB.y + y, dir: x < 200 ? 1 : -1 }; });   // dir：插頭朝向（1＝往右插進去）
+  [['A', 32, 272], ['C', 32, 400], ['E', 32, 528], ['B', 480, 272], ['D', 480, 400], ['F', 480, 528]].forEach(([p, x, y]) => { SOCK[p] = { x: HUB.x + x * K, y: HUB.y + y * K, dir: x < 200 ? 1 : -1 }; });   // dir：插頭朝向（1＝往右插進去）
 
   const root = $('tab-wire'); if (!root) return;
   const svg = S('svg', { viewBox: '0 0 ' + W + ' ' + HH, class: 'wire-svg', role: 'application', 'aria-label': '接口連接：拖曳零件的插頭到主機的接口' });
@@ -26,16 +26,16 @@
   svg.append(defs);
   const gHub = S('g'), gCable = S('g'), gSock = S('g'), gParts = S('g'), gPlug = S('g'), gLabel = S('g');
   svg.append(gHub, gSock, gCable, gParts, gPlug, gLabel);
-  const hubFallback = S('rect', { x: HUB.x + 108, y: HUB.y + 76, width: 234, height: 368, rx: 16, fill: '#f8fafc', stroke: '#94a3b8', 'stroke-width': 3 }); hubFallback.style.display = 'none';
-  const hubImg = S('image', { href: 'assets/parts/img/hub-top-blank.png', x: HUB.x, y: HUB.y, width: HUB.w, height: HUB.h, filter: 'url(#wsh)' });
-  { const pr = new Image(); pr.onerror = () => { hubImg.style.display = 'none'; hubFallback.style.display = ''; }; pr.src = 'assets/parts/img/hub-top-blank.png'; }
+  const hubFallback = S('rect', { x: HUB.x + 32 * K, y: HUB.y + 48 * K, width: 448 * K, height: 704 * K, rx: 16, fill: '#f8fafc', stroke: '#94a3b8', 'stroke-width': 3 }); hubFallback.style.display = 'none';
+  const hubImg = S('image', { href: 'assets/parts/render/hub-top.png', x: HUB.x, y: HUB.y, width: HUB.w, height: HUB.h, filter: 'url(#wsh)' });
+  { const pr = new Image(); pr.onerror = () => { hubImg.style.display = 'none'; hubFallback.style.display = ''; }; pr.src = 'assets/parts/render/hub-top.png'; }
   gHub.append(hubFallback, hubImg);
 
   /* ----- 燈陣（和主機同步：官方主機的 5×5 方形小燈）----- */
   const gLed = S('g'); gHub.append(gLed);
   const ledEl = [];
   for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) {
-    const e = S('rect', { x: HUB.x + 158 + 33.5 * c - 12.5, y: HUB.y + 193 + 33.25 * r - 12.5, width: 25, height: 25, rx: 3, class: 'wled' });
+    const e = S('rect', { x: HUB.x + (256 + (c - 2) * 64 - 24) * K, y: HUB.y + (400 + (r - 2) * 64 - 24) * K, width: 48 * K, height: 48 * K, rx: 3, class: 'wled' });
     gLed.append(e); ledEl.push(e);
   }
   function ledTick() {

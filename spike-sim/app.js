@@ -232,7 +232,7 @@
   }
   ['A', 'C', 'E'].forEach((p) => buildPort(p, 'ports-left'));
   ['B', 'D', 'F'].forEach((p) => buildPort(p, 'ports-right'));
-  { const probe = new Image(); probe.onerror = () => document.querySelector('.hubtop') && document.querySelector('.hubtop').classList.add('noimg'); probe.src = 'assets/parts/img/hub-top-blank.png'; }   // 沒有官方主機圖時改用簡單外框
+  { const probe = new Image(); probe.onerror = () => document.querySelector('.hubtop') && document.querySelector('.hubtop').classList.add('noimg'); probe.src = 'assets/parts/render/hub-top.png'; }   // 沒有官方主機圖時改用簡單外框
   const cells = []; for (let i = 0; i < 25; i++) { const c = document.createElement('i'); $('matrix').appendChild(c); cells.push(c); }
   const POWER_CSS = { 0: '#222', 1: '#ff2bd0', 2: '#8a2be2', 3: '#2a62ff', 4: '#40c0ff', 5: '#20e0c0', 6: '#22c55e', 7: '#ffd400', 8: '#ff8c1a', 9: '#ff2d2d', 10: '#fff' };
   const CN = { black: '黑色', white: '白色', red: '紅色', yellow: '黃色', green: '綠色', blue: '藍色', none: '無' };

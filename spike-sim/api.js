@@ -54,6 +54,35 @@
     const num = (v) => { v = Number(v); return isFinite(v) ? v : 0; };
     const clamp = (v) => Math.max(-100, Math.min(100, num(v)));
     const wait = (s) => { const t = sim.simTime + Math.max(0, num(s)); return sim.waitUntil(() => sim.simTime >= t); };
+
+    /* ----- 5×5 燈陣的字型（每個字 5 列；小寫字母用大寫字型）----- */
+    const GLYPH = {
+      A: ['.###.', '#...#', '#####', '#...#', '#...#'], B: ['####.', '#...#', '####.', '#...#', '####.'], C: ['.####', '#....', '#....', '#....', '.####'],
+      D: ['####.', '#...#', '#...#', '#...#', '####.'], E: ['#####', '#....', '####.', '#....', '#####'], F: ['#####', '#....', '####.', '#....', '#....'],
+      G: ['.####', '#....', '#..##', '#...#', '.####'], H: ['#...#', '#...#', '#####', '#...#', '#...#'], I: ['###', '.#.', '.#.', '.#.', '###'],
+      J: ['..#', '..#', '..#', '#.#', '.#.'], K: ['#..#', '#.#.', '##..', '#.#.', '#..#'], L: ['#..', '#..', '#..', '#..', '###'],
+      M: ['#...#', '##.##', '#.#.#', '#...#', '#...#'], N: ['#...#', '##..#', '#.#.#', '#..##', '#...#'], O: ['.###.', '#...#', '#...#', '#...#', '.###.'],
+      P: ['####.', '#...#', '####.', '#....', '#....'], Q: ['.###.', '#...#', '#.#.#', '#..#.', '.##.#'], R: ['####.', '#...#', '####.', '#.#..', '#..##'],
+      S: ['.####', '#....', '.###.', '....#', '####.'], T: ['#####', '..#..', '..#..', '..#..', '..#..'], U: ['#...#', '#...#', '#...#', '#...#', '.###.'],
+      V: ['#...#', '#...#', '#...#', '.#.#.', '..#..'], W: ['#...#', '#...#', '#.#.#', '##.##', '#...#'], X: ['#...#', '.#.#.', '..#..', '.#.#.', '#...#'],
+      Y: ['#...#', '.#.#.', '..#..', '..#..', '..#..'], Z: ['#####', '...#.', '..#..', '.#...', '#####'],
+      0: ['.###.', '#..##', '#.#.#', '##..#', '.###.'], 1: ['.#.', '##.', '.#.', '.#.', '###'], 2: ['.##.', '#..#', '..#.', '.#..', '####'],
+      3: ['###.', '...#', '.##.', '...#', '###.'], 4: ['#..#', '#..#', '####', '...#', '...#'], 5: ['####', '#...', '###.', '...#', '###.'],
+      6: ['.###', '#...', '###.', '#..#', '.##.'], 7: ['####', '...#', '..#.', '.#..', '.#..'], 8: ['.##.', '#..#', '.##.', '#..#', '.##.'], 9: ['.##.', '#..#', '.###', '...#', '###.'],
+      '.': ['.', '.', '.', '.', '#'], ',': ['.', '.', '.', '#', '#'], '!': ['#', '#', '#', '.', '#'], '?': ['.##.', '#..#', '..#.', '....', '..#.'],
+      '-': ['...', '...', '###', '...', '...'], ':': ['.', '#', '.', '#', '.'], ' ': ['..', '..', '..', '..', '..'],
+    };
+    const textCols = (s) => {          // 把文字變成一欄一欄的亮點（每欄 5 格），字與字中間空 1 欄
+      const cols = [];
+      for (const ch of String(s)) {
+        const g = GLYPH[ch.toUpperCase()] || GLYPH['?'];
+        for (let x = 0; x < g[0].length; x++) cols.push(g.map((row) => (row[x] === '#' ? 1 : 0)));
+        cols.push([0, 0, 0, 0, 0]);
+      }
+      return cols;
+    };
+    let textTok = 0;
+    const stopText = () => { textTok++; };
     let audio = null, osc = null, seen = {};
     let msgs = {}, handled = {}, receivers = {}, killed = new Set(), threadCount = 0;
     const DEV = { motor: '馬達', color: '顏色感測器', distance: '距離感測器', force: '力感測器' };
@@ -161,6 +190,7 @@
 
       /* ----- 燈光 ----- */
       lightImage(id) {
+        stopText();
         const im = IMAGES[Math.round(num(id))];
         if (!im) throw new Error('模擬器尚未支援圖案 ' + id + '（目前有：' + Object.keys(IMAGES).join('、') + '）');
         setLed(im[2], sim.matrixBright);
@@ -170,9 +200,21 @@
         const map = { heart: 1, smile: 4, sad: 5, up: 27, check: 13, cross: 14 };
         this.lightImage(map[name] || 1);
       },
-      lightText(t) { sim.displayText = String(t); sim.led.fill(0); io.say('[主機螢幕] ' + t); },
-      lightShow(list) { sim.led = Array.from({ length: 25 }, (_, i) => Math.max(0, Math.min(100, num(list[i])))); sim.displayText = ''; },
-      lightOff() { sim.led.fill(0); sim.displayText = ''; },
+      async lightText(t, tpc) {       // 文字從右邊一欄一欄捲過燈陣（官方：每個字約 500 毫秒）
+        const tok = ++textTok, str = String(t); sim.displayText = str; io.say('[主機螢幕] ' + str);
+        const cols = textCols(str), step = Math.max(0.02, (num(tpc) > 0 ? num(tpc) : 500) / 1000 / 6);
+        try {
+          for (let off = -5; off < cols.length; off++) {
+            if (tok !== textTok) return;
+            const led = new Array(25).fill(0);
+            for (let x = 0; x < 5; x++) { const c = cols[off + x]; if (c) for (let y = 0; y < 5; y++) if (c[y]) led[y * 5 + x] = sim.matrixBright; }
+            sim.led = led; await wait(step);
+          }
+          if (tok === textTok) { sim.led = new Array(25).fill(0); sim.displayText = ''; }
+        } catch (e) { /* 程式停止時 */ }
+      },
+      lightShow(list) { stopText(); sim.led = Array.from({ length: 25 }, (_, i) => Math.max(0, Math.min(100, num(list[i])))); sim.displayText = ''; },
+      lightOff() { stopText(); sim.led.fill(0); sim.displayText = ''; },
       lightBrightness(p) { sim.matrixBright = Math.max(0, Math.min(100, num(p))); },
       lightPixel(x, y, b) {
         x = Math.round(num(x)); y = Math.round(num(y));

@@ -87,8 +87,7 @@ class _LightMatrix:
         return _sp.lightOrientGet()
     @_aw
     async def write(self, text, intensity=100, time_per_character=500):
-        _sp.lightText(str(text))
-        await _sp.wait(max(1, len(str(text))) * time_per_character / 1000)
+        await _sp.lightText(str(text), time_per_character)
 for _i, _n in enumerate(_IMG):
     setattr(_LightMatrix, "IMAGE_" + _n, _i + 1)
 light_matrix = _LightMatrix()
@@ -509,7 +508,7 @@ async def _spike_exec(src):
   function install(api, sim, io) {
     const pct = (v) => (Number(v) || 0) / 10;
     const m = {
-      lightImage: (id) => api.lightImage(id), lightShow: (l) => api.lightShow(Array.from(l)), lightText: (t) => api.lightText(t),
+      lightImage: (id) => api.lightImage(id), lightShow: (l) => api.lightShow(Array.from(l)), lightText: (t, tpc) => api.lightText(t, tpc),
       lightOff: () => api.lightOff(), lightPixel: (x, y, b) => api.lightPixel(x, y, b), lightGet: (x, y) => api.lightGet(x, y),
       lightOrient: (q) => api.lightOrient(q), lightOrientGet: () => api.lightOrientGet(), centerLight: (c) => api.centerLight(c),
       buttonMs: (side) => api.buttonMs(side),
