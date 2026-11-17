@@ -264,8 +264,9 @@
     ids.forEach((id) => grid.append(panes.get(id).root));      // 依官方順序排好
     grid.className = 'comp-grid n' + Math.min(ids.length, 8); empty.hidden = ids.length > 0; grid.hidden = ids.length === 0;
   }
+  const orderOf = (id) => { const [k, p] = id.split(':'); return ({ hub: 0, motor: 1, color: 3, dist: 4, force: 5, gyro: 6 }[k] || 9) * 10 + (p ? p.charCodeAt(0) - 64 : 0); };
   function refresh() {
-    const ids = detect(), s = ids.join('|');
+    const ids = [...new Set([...detect(), ...(SP.compForce || [])])].sort((x, y) => orderOf(x) - orderOf(y)), s = ids.join('|');
     const badge = $('comp-badge'); badge.hidden = !ids.length; badge.textContent = ids.length;
     if (s !== sig) { sig = s; render(ids); }
   }

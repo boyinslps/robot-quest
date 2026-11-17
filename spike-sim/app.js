@@ -433,6 +433,7 @@
     return { app: 'spike-sim', v: 1, name: $('proj-name').value, ports: sim.ports, scene: $('scene').value, settings: readSettings(), field: sim.exportField(), mode, py: pySrc.value, pyDirty, workspace: Blockly.serialization.workspaces.save(ws) };
   }
   function restore(d) {
+    if (SP.lesson && SP.lesson.active() && !SP.lesson.starting) SP.lesson.exit();
     stopProgram(); ws.clear();
     if (d.workspace) Blockly.serialization.workspaces.load(d.workspace, ws);
     $('proj-name').value = d.name || '未命名專案';
@@ -471,21 +472,7 @@
   /* ---------- 首頁與範例 ---------- */
   const eq = (type, fields, inputs, next) => ({ type, ...(fields ? { fields } : {}), ...(inputs ? { inputs } : {}), ...(next ? { next: { block: next } } : {}) });
   const ife = (inputs) => ({ ...eq('controls_if', null, inputs), extraState: { hasElse: true } });
-  const LESSON = (name, desc, color, blocks) => ({ name, desc, scene: 'blank', color, view: 'comp', ws: { blocks: { languageVersion: 0, blocks } } });
   const SAMPLES = [
-    LESSON('入門 1・母體燈', '讓主機的 5×5 小燈亮出笑臉。跑完到「元件模擬」看小燈；再把圖案換成別的試試。', '#b896f8', [eq('sp_start', null, null, eq('sp_light_image', { IMG: '3' }))].map((b) => ({ ...b, x: 40, y: 40 }))),
-    LESSON('入門 2・馬達', '設定速度 75%，讓馬達 A 轉 1 圈。把速度改大，看看轉得有沒有更快；也可以用滑鼠轉轉看馬達。', '#0090f5', [eq('sp_start', null, null, eq('sp_motor_speed_set', { PORT: 'A' }, { P: nb(75) }, eq('sp_motor_run', { PORT: 'A', DIR: '1', UNIT: 'rot' }, { N: nb(1) })))].map((b) => ({ ...b, x: 40, y: 40 }))),
-    LESSON('入門 3・顏色感測器', '看到紅色，主機就亮起笑臉。把紅色色塊拖到感測器前面試試；再把積木改成黃色。', '#34ccf1', [eq('sp_when_color', { PORT: 'C', COLOR: 'red' }, null, eq('sp_light_image', { IMG: '3' }))].map((b) => ({ ...b, x: 40, y: 40 }))),
-    LESSON('入門 4・距離感測器', '東西靠近到 20% 以內，主機就嗶一聲。把物體拖近感測器；再把數字改大，從更遠的地方就會嗶。', '#34ccf1', [eq('sp_when_dist', { PORT: 'D', OP: '<' }, { N: nb(20) }, eq('sp_beep', null, { NOTE: nb(60), S: nb(0.2) }))].map((b) => ({ ...b, x: 40, y: 40 }))),
-    LESSON('入門 5・力傳感器', '按下力傳感器，馬達就轉；放開就停。用滑鼠按住黑色圓鈕試試。', '#34ccf1', [eq('sp_when_force', { PORT: 'E', STATE: 'down' }, null, eq('sp_motor_start', { PORT: 'A', DIR: '1' })), eq('sp_when_force', { PORT: 'E', STATE: 'up' }, null, eq('sp_motor_stop', { PORT: 'A' }))].map((b, i) => ({ ...b, x: 40, y: 40 + i * 120 }))),
-    LESSON('入門 6・陀螺儀', '主機向右傾斜時，小燈亮起笑臉；放平就關燈。在「元件模擬」用滑鼠拖主機傾斜，再把程式改成向左。', '#34ccf1', [eq('sp_when_tilt', { DIR: 'right' }, null, eq('sp_light_image', { IMG: '3' })), eq('sp_when_tilt', { DIR: 'flat' }, null, eq('sp_light_off'))].map((b, i) => ({ ...b, x: 40, y: 40 + i * 120 }))),
-    { name: '走正方形', desc: '重複 4 次：前進 40 公分、右轉 90 度。', scene: 'blank', color: '#4c97ff', ws: DEFAULT },
-    { name: '遇牆就轉彎', desc: '一直重複：距離小於 20 公分就右轉，不然前進。', scene: 'boxes', color: '#5cb1d6', ws: { blocks: { languageVersion: 0, blocks: [eq('sp_start', null, null, eq('sp_forever', null, { DO: { block: ife({
-      IF0: { block: eq('sp_dist_less', { PORT: 'D', OP: '<' }, { N: nb(20) }) }, DO0: { block: eq('sp_turn', { DIR: '1' }, { DEG: nb(90) }) }, ELSE: { block: eq('sp_move', { DIR: '1', UNIT: 'cm' }, { N: nb(5) }) } }) } })) ] } } },
-    { name: '黑線循線', desc: '顏色感測器看到黑色就向右修正，否則向左，沿著跑道繞圈。', scene: 'line', color: '#59c059', ws: { blocks: { languageVersion: 0, blocks: [eq('sp_start', null, null, eq('sp_set_speed', null, { P: nb(30) }, eq('sp_forever', null, { DO: { block: ife({
-      IF0: { block: eq('sp_color_is', { PORT: 'C', COLOR: 'black' }) }, DO0: { block: eq('sp_steer', null, { STEER: nb(35) }) }, ELSE: { block: eq('sp_steer', null, { STEER: nb(-35) }) } }) } }))) ] } } },
-    { name: '看到紅色就停', desc: '開始前進，等到顏色感測器看到紅色就停止並發出嗶聲。', scene: 'colors', color: '#ff8c1a', ws: { blocks: { languageVersion: 0, blocks: [eq('sp_start', null, null, eq('sp_start_move', { DIR: '1' }, null,
-      eq('sp_wait_until', null, { C: { block: eq('sp_color_is', { PORT: 'C', COLOR: 'red' }) } }, eq('sp_stop', null, null, eq('sp_beep', null, { NOTE: nb(72), S: nb(0.5) }))))) ] } } },
     { name: 'Python：前進再後退', desc: '用 move_for_degrees 前進 40 公分、再後退 40 公分（負的度數代表反方向）。', scene: 'blank', color: '#3d4357', py: [
       'from hub import port', 'import runloop, motor_pair', '', '# 輪子轉一圈大約走 17.6 公分', 'def degrees_for_distance(cm):', '    return int(cm / 17.6 * 360)', '',
       'async def main():', '    motor_pair.pair(motor_pair.PAIR_1, port.A, port.B)',
@@ -510,7 +497,8 @@
     b.onclick = () => { fn(); $('home').hidden = true; Blockly.svgResize(ws); }; parent.appendChild(b);
   }
   function buildHome(saved) {
-    $('tiles-start').textContent = ''; $('tiles-sample').textContent = '';
+    $('tiles-start').textContent = ''; $('tiles-sample').textContent = ''; $('tiles-lesson').textContent = '';
+    ((SP.lessons) || []).forEach((l) => tile($('tiles-lesson'), l.title, l.desc, l.color, l.glyph, () => SP.lesson.start(l.id)));
     tile($('tiles-start'), '新專案', '從空白開始，只有「當程式開始」。', '#4c97ff', '+', () => restore({ workspace: { blocks: { languageVersion: 0, blocks: [{ type: 'sp_start', x: 40, y: 40 }] } }, name: '未命名專案' }));
     if (saved && saved.workspace) tile($('tiles-start'), '繼續：' + (saved.name || '未命名專案'), '回到上次編輯的內容。', '#2fb85f', '>', () => restore(saved));
     tile($('tiles-start'), '開啟檔案', '開啟之前儲存的 .json。', '#9966ff', '↑', () => $('file-open').click());
@@ -531,7 +519,8 @@
   SP.ws = ws; SP.sim = sim; SP.run = runProgram;
   SP.ui = {      // 給 bench.js（機構單獨測試面板）用
     sim, api, ws, say, setMode, autosave, pySrc, POWER_CSS,
-    isRunning: () => running, isPyDirty: () => pyDirty, mode: () => mode,
+    isRunning: () => running, isPyDirty: () => pyDirty, mode: () => mode, restore,
+    rebuildHome() { let sv = null; try { sv = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { /* 略 */ } buildHome(sv); },
     loadPython(code) { pySrc.value = code; pyDirty = true; $('py-note').textContent = '已放入範例（不會變回積木）'; setMode('python'); updateGutter(); autosave(); },
     refreshPortSelects() { for (const p of ['C', 'D', 'E', 'F']) if (portEl[p + 'sel']) portEl[p + 'sel'].value = sim.ports[p]; autosave(); },
   };
