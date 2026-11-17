@@ -290,7 +290,7 @@
   const root = $('tab-comp'), grid = H('div', { class: 'comp-grid' }), empty = H('div', { class: 'comp-empty' }, H('div', {}, H('b', { text: '還沒有用到會動的零件' }), '到左邊拖一個積木過來，例如「馬達 轉動」、「當 力傳感器 被按下」，',
     H('br'), '這裡就會出現對應的零件，可以直接用滑鼠玩。'));
   root.append(strip, grid, empty);
-  const make = (id) => { const [k, p] = id.split(':'); return k === 'hub' ? hubPart() : k === 'motor' ? motorPart(p) : k === 'color' ? colorPart(p) : k === 'dist' ? distPart(p) : k === 'force' ? forcePart(p) : gyroPart(); };
+  const make = (id) => { const [k, p] = id.split(':'); if (SP.part3d && SP.part3d.ready) { const m3 = SP.part3d.make(k, p); if (m3) return m3; } return k === 'hub' ? hubPart() : k === 'motor' ? motorPart(p) : k === 'color' ? colorPart(p) : k === 'dist' ? distPart(p) : k === 'force' ? forcePart(p) : gyroPart(); };
   let panes = new Map(), sig = '';
   function connect(ids) {
     let changed = false;
@@ -326,8 +326,10 @@
   function showView(v) {
     if (v === view) return; view = v;
     document.querySelectorAll('#viewtabs button[data-view]').forEach((b) => b.classList.toggle('on', b.dataset.view === v));
-    $('tab-field').hidden = v !== 'field'; root.hidden = v !== 'comp';
-    if (v === 'comp') { sim.lifted = true; refresh(); cancelAnimationFrame(raf); loop(); }
+    $('tab-field').hidden = v !== 'field'; root.hidden = v !== 'comp'; const tw = $('tab-wire'); if (tw) tw.hidden = v !== 'wire';
+    if (SP.wire) { if (v === 'wire') SP.wire.show(); else SP.wire.hide(); }
+    if (v === 'wire') { sim.lifted = true; cancelAnimationFrame(raf); }
+    else if (v === 'comp') { sim.lifted = true; refresh(); cancelAnimationFrame(raf); loop(); }
     else {
       cancelAnimationFrame(raf); sim.lifted = false; sim.buttons.left = sim.buttons.right = 0;
       Object.assign(sim.hand, { color: null, dist: null, force: null, pitch: 0, roll: 0 }); state.brick = null; state.hover = null; state.dist = 200; state.force = 0;
@@ -337,4 +339,7 @@
   document.querySelectorAll('#viewtabs button[data-view]').forEach((b) => { b.onclick = () => showView(b.dataset.view); });
   SP.showView = showView; SP.compParts = () => [...panes.keys()];
   refresh();
+  // 3D 零件模型載入完成：把已經建好的平面版零件換成 3D 版
+  window.addEventListener('sp-part3d-ready', () => { for (const [, pn] of panes) { if (pn.destroy) pn.destroy(); pn.root.remove(); } panes.clear(); sig = ''; refresh(); });
+  SP.compKit = { H, S, sim, U, api, state, frame, COLOR_HEX, COLOR_ZH, COLOR_NUM, FACE, clamp, rad };
 })(window.SP = window.SP || {});

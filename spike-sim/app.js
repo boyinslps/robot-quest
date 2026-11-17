@@ -232,6 +232,7 @@
   }
   ['A', 'C', 'E'].forEach((p) => buildPort(p, 'ports-left'));
   ['B', 'D', 'F'].forEach((p) => buildPort(p, 'ports-right'));
+  { const probe = new Image(); probe.onerror = () => document.querySelector('.hubtop') && document.querySelector('.hubtop').classList.add('noimg'); probe.src = 'assets/parts/img/hub-top-blank.png'; }   // 沒有官方主機圖時改用簡單外框
   const cells = []; for (let i = 0; i < 25; i++) { const c = document.createElement('i'); $('matrix').appendChild(c); cells.push(c); }
   const POWER_CSS = { 0: '#222', 1: '#ff2bd0', 2: '#8a2be2', 3: '#2a62ff', 4: '#40c0ff', 5: '#20e0c0', 6: '#22c55e', 7: '#ffd400', 8: '#ff8c1a', 9: '#ff2d2d', 10: '#fff' };
   const CN = { black: '黑色', white: '白色', red: '紅色', yellow: '黃色', green: '綠色', blue: '藍色', none: '無' };
@@ -246,9 +247,11 @@
     for (let cy = 0; cy < 5; cy++) for (let cx = 0; cx < 5; cx++) {
       const [sx, sy] = r === 0 ? [cx, cy] : r === 1 ? [cy, 4 - cx] : r === 2 ? [4 - cx, 4 - cy] : [4 - cy, cx];
       const b = sim.led[sy * 5 + sx];
-      cells[cy * 5 + cx].style.background = b ? `rgb(${60 + b * 1.9},${60 + b * 1.7},${70 + b * 0.2})` : '';
+      const c = cells[cy * 5 + cx];
+      if (b) { c.style.background = `rgba(255,${205 + Math.round(b * 0.3)},${140 + Math.round(b * 0.6)},${(0.35 + b * 0.0065).toFixed(2)})`; c.style.boxShadow = b > 30 ? '0 0 7px rgba(255,200,120,.85)' : 'none'; }
+      else { c.style.background = ''; c.style.boxShadow = ''; }
     }
-    $('hub-power').style.background = POWER_CSS[sim.powerColor] || '#fff';
+    $('hub-power').style.borderColor = POWER_CSS[sim.powerColor] || '#22c55e'; $('hub-power').style.boxShadow = '0 0 8px ' + (POWER_CSS[sim.powerColor] || '#22c55e');
     $('hub-text').textContent = sim.displayText || ' ';
     $('val-yaw').textContent = '轉向角度 ' + sim.yaw() + '°';
     $('val-timer').textContent = '計時器 ' + sim.timer().toFixed(1) + ' 秒';

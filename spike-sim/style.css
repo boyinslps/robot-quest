@@ -294,3 +294,48 @@ body.has-lesson #tab-comp { min-height: min(640px, calc(100vh - 330px)); }
 .viewtabs { grid-template-columns: 1fr 1fr auto; }
 .viewtabs .cleardata { background: #fff; color: #b3261e; border: 2px solid #f1c9c5; font-size: 13px; padding: 6px 12px; }
 .viewtabs .cleardata:hover { background: #ffeceb; color: #b3261e; }
+
+/* ===== 接口連接 ===== */
+.wire-wrap{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:10px;margin:10px 0}
+.wire-svg{width:100%;height:auto;max-height:640px;display:block;user-select:none;touch-action:none}
+.wire-hint{margin:6px 4px 2px;color:#475569;font-size:.9rem}
+.wire-svg .wcard{fill:#f8fafc;stroke:#e2e8f0;stroke-width:2}
+.wire-svg .wname{font-size:15px;font-weight:700;fill:#334155}
+.wire-svg .wcable-edge{fill:none;stroke:#94a3b8;stroke-width:13;stroke-linecap:round}
+.wire-svg .wcable{fill:none;stroke:#f8fafc;stroke-width:9;stroke-linecap:round}
+.wire-svg .wplug{cursor:grab}
+.wire-svg .wplug.grab{cursor:grabbing;filter:drop-shadow(0 4px 4px rgba(0,0,0,.35))}
+.wire-svg .wplug-shell{fill:rgba(241,245,249,.92);stroke:#64748b;stroke-width:2}
+.wire-svg .wplug-pin{fill:#d4a017}
+.wire-svg .wplug-tip{fill:#cbd5e1;stroke:#64748b;stroke-width:1.5}
+.wire-svg .wsock-body{fill:#334155}
+.wire-svg .wsock-hit{fill:transparent;stroke:transparent;stroke-width:3;stroke-dasharray:6 5}
+.wire-svg .wsock.over .wsock-hit{stroke:#2563eb;fill:rgba(37,99,235,.12)}
+.wire-svg .wsock.full .wsock-body{fill:#0f172a}
+.wire-svg .wlabel{font-size:14px;font-weight:700;fill:#1d4ed8}
+
+/* ===== 主機：官方主機俯視圖＋真實 5×5 燈陣（方形小燈、有間隔） ===== */
+.hubgrid { grid-template-columns: 1fr 190px 1fr; }
+.hub { background: transparent; border: 0; padding: 0; }
+.hubtop { position: relative; width: 100%; max-width: 200px; aspect-ratio: 250 / 384; margin: 0 auto;
+  background: url(assets/parts/img/hub-top-blank.png) 50% 54% / 180% 132.8% no-repeat; }
+.hubtop .matrix { position: absolute; left: 16.5%; top: 28.2%; width: 67%; height: 43.6%; background: transparent; padding: 0; border-radius: 0;
+  display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(5, 1fr); gap: 0; place-items: center; }
+.hubtop .matrix i { width: 75%; height: auto; aspect-ratio: 1; border-radius: 3px; background: rgba(110, 95, 60, .07); }
+.hubtop .hbtn { position: absolute; top: 81%; width: 24%; height: 8.3%; border: 0; border-radius: 999px; background: transparent; font-size: 0; cursor: pointer; }
+.hubtop .hbtn.hl { left: 16.8%; } .hubtop .hbtn.hr { left: 61.2%; }
+.hubtop .hbtn:hover { background: rgba(37, 99, 235, .10); } .hubtop .hbtn.down { background: rgba(0, 0, 0, .16); transform: none; }
+.hubtop .hub-btn { position: absolute; left: 50%; top: 85.2%; width: 26.4%; aspect-ratio: 1; transform: translate(-50%, -50%); background: transparent; border: 4px solid #22c55e; border-radius: 50%; box-sizing: border-box; }
+
+.hubtop .hub-btn { height: auto; border-width: 3px; }
+
+/* ===== 元件模擬 3D ===== */
+.p3d-host{position:relative;width:100%;aspect-ratio:4/3;background:linear-gradient(#f4f7fb,#e3e9f2);border-radius:10px;overflow:hidden;touch-action:none}
+.p3d{display:block;width:100%;height:100%;cursor:grab}
+.p3d:active{cursor:grabbing}
+.p3d-loading{position:absolute;inset:0;display:grid;place-items:center;color:#64748b;font-weight:700;font-size:.9rem}
+.p3d-bar{display:flex;gap:6px;justify-content:center;margin:6px 0 2px}
+.p3d-bar button{font:inherit;font-size:.78rem;padding:2px 10px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#334155;cursor:pointer}
+.p3d-bar button:hover{background:#f1f5f9}
+
+.hubtop.noimg { background: #f3f5f9; border: 2px solid #c9cfdb; border-radius: 14px; }
