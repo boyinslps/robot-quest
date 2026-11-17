@@ -48,7 +48,7 @@
   const stmt = { previousStatement: null, nextStatement: null };
   const ALL_PORTS = ['A', 'B', 'C', 'D', 'E', 'F'];
   const PORTS = (first) => ALL_PORTS.slice().sort((a, b) => (a === first ? -1 : b === first ? 1 : 0)).map((p) => [p, p]);
-  const SENSOR_PORTS = (first) => ['C', 'D', 'E', 'F'].sort((a, b) => (a === first ? -1 : b === first ? 1 : 0)).map((p) => [p, p]);
+  const SENSOR_PORTS = PORTS;     // 六個埠都能接感測器
   const COLORS = [['黑色', 'black'], ['白色', 'white'], ['紅色', 'red'], ['黃色', 'yellow'], ['綠色', 'green'], ['藍色', 'blue'], ['沒有顏色', 'none']];
   const POWER_COLORS = [['黑色（關）', '0'], ['洋紅', '1'], ['紫色', '2'], ['藍色', '3'], ['淺藍', '4'], ['青綠', '5'], ['綠色', '6'], ['黃色', '7'], ['橘色', '8'], ['紅色', '9'], ['白色', '10']];
   const DIR_FWD = [['前進 ↑', '1'], ['後退 ↓', '-1']];

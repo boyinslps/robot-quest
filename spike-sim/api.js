@@ -56,17 +56,15 @@
     const wait = (s) => { const t = sim.simTime + Math.max(0, num(s)); return sim.waitUntil(() => sim.simTime >= t); };
     let audio = null, osc = null, seen = {};
     let msgs = {}, handled = {}, receivers = {}, killed = new Set(), threadCount = 0;
+    const DEV = { motor: '馬達', color: '顏色感測器', distance: '距離感測器', force: '力感測器' };
+    const wrongPort = (p, type) => '埠 ' + p + (sim.ports[p] === 'none' ? ' 沒有連接' + DEV[type] : ' 接的是' + DEV[sim.ports[p]] + '，不是' + DEV[type]) + '（請到「元件模擬」的接口或「主機與裝置」確認）';
     const motorOf = (p) => {
-      if (p === 'A') return sim.mL;
-      if (p === 'B') return sim.mR;
-      throw new Error('埠 ' + p + ' 沒有馬達（模擬器：A＝左輪、B＝右輪）');
+      const m = sim.mot[p]; if (!m) throw new Error('沒有「' + p + '」這個埠');
+      if (sim.ports[p] !== 'motor') throw new Error(wrongPort(p, 'motor'));
+      return m;
     };
-    const need = (p, type) => {
-      if (sim.ports[p] !== type) {
-        const nm = { color: '顏色感測器', distance: '距離感測器', force: '力感測器' }[type];
-        throw new Error('埠 ' + p + ' 沒有連接' + nm + '（請到「主機與裝置」確認）');
-      }
-    };
+    const need = (p, type) => { if (sim.ports[p] !== type) throw new Error(wrongPort(p, type)); };
+    const needPair = () => { for (const p of [sim.pairL, sim.pairR]) if (sim.ports[p] !== 'motor') throw new Error('移動需要兩顆馬達（目前的移動馬達組是 ' + sim.pairL + ' + ' + sim.pairR + '）：' + wrongPort(p, 'motor')); };
     const toDeg = (n, unit) => (unit === 'rot' ? n * 360 : unit === 'deg' ? n : unit === 'cm' ? (n / sim.cmPerRot) * 360 : unit === 'in' ? (n * 2.54 / sim.cmPerRot) * 360 : 0);
 
     // 讓兩顆馬達依速度比例轉 deg 度（取轉比較多的那顆當基準）
@@ -96,20 +94,20 @@
       /* ----- 移動（雙馬達） ----- */
       setSpeed(p) { sim.speedPct = Math.max(-100, Math.min(100, num(p))); },
       setDistance(cm) { const v = num(cm); if (v > 0) sim.cmPerRot = v; },
-      setPair(p) { if (p !== 'A+B') throw new Error('模擬器目前只支援「A+B」（A＝左輪、B＝右輪），不支援 ' + p); },
+      setPair(p) { const m = /^([A-F])\+([A-F])$/.exec(String(p)); if (!m || m[1] === m[2]) throw new Error('無法設定移動馬達組：' + p); sim.pairL = m[1]; sim.pairR = m[2]; },
       async move(dir, n, unit) {
-        n = Math.abs(num(n)); const sp = sim.speedPct; if (!sp || !n) return;
+        needPair(); n = Math.abs(num(n)); const sp = sim.speedPct; if (!sp || !n) return;
         if (unit === 'sec') { sim.drive(dir * sp, dir * sp); await wait(n); sim.stopAll(); return; }
         return driveDeg(toDeg(n, unit), dir * sp, dir * sp);
       },
       async steerFor(steer, n, unit, dir) {
-        n = Math.abs(num(n)); const sp = (dir || 1) * sim.speedPct; if (!sp || !n) return;
+        needPair(); n = Math.abs(num(n)); const sp = (dir || 1) * sim.speedPct; if (!sp || !n) return;
         const [l, r] = steerLR(sp, clamp(steer));
         if (unit === 'sec') { sim.drive(l, r); await wait(n); sim.stopAll(); return; }
         return driveDeg(toDeg(n, unit), l, r);
       },
       async turn(dir, deg) {     // 非官方：用陀螺儀原地轉指定角度
-        deg = Math.abs(num(deg)); const sp = Math.abs(sim.speedPct); if (!sp || !deg) return;
+        needPair(); deg = Math.abs(num(deg)); const sp = Math.abs(sim.speedPct); if (!sp || !deg) return;
         const th0 = sim.th; sim.lastMoveT = sim.simTime;
         await sim.waitUntil(() => {
           const rem = deg - dir * (sim.th - th0) * 180 / Math.PI;
@@ -119,12 +117,12 @@
         sim.stopAll();
       },
       startMove(dir, steer) { this.steer(dir * sim.speedPct, steer); },
-      steer(speed, steer) { const [l, r] = steerLR(clamp(speed), clamp(steer)); sim.drive(l, r); },
-      tank(l, r) { sim.drive(clamp(l), clamp(r)); },
+      steer(speed, steer) { needPair(); const [l, r] = steerLR(clamp(speed), clamp(steer)); sim.drive(l, r); },
+      tank(l, r) { needPair(); sim.drive(clamp(l), clamp(r)); },
       stop() { sim.stopAll(); },
-      async moveDegrees(deg, steer, pct) { const [l, r] = steerLR(clamp(pct), clamp(steer)); return driveDeg(deg, l, r); },
-      async tankDegrees(deg, l, r) { return driveDeg(deg, clamp(l), clamp(r)); },
-      async moveTime(ms, steer, pct) { const [l, r] = steerLR(clamp(pct), clamp(steer)); sim.drive(l, r); await wait(num(ms) / 1000); sim.stopAll(); },
+      async moveDegrees(deg, steer, pct) { needPair(); const [l, r] = steerLR(clamp(pct), clamp(steer)); return driveDeg(deg, l, r); },
+      async tankDegrees(deg, l, r) { needPair(); return driveDeg(deg, clamp(l), clamp(r)); },
+      async moveTime(ms, steer, pct) { needPair(); const [l, r] = steerLR(clamp(pct), clamp(steer)); sim.drive(l, r); await wait(num(ms) / 1000); sim.stopAll(); },
 
       /* ----- 單顆馬達 ----- */
       motorSetSpeed(p, v) { motorOf(p); sim.motorSpeed[p] = Math.max(-100, Math.min(100, num(v))); },
@@ -152,12 +150,12 @@
         return this.motorTurnAt(p, delta, speedPct || Math.abs(sim.motorSpeed[p]) || 50);
       },
       motorStartDir(p, dir) { const m = motorOf(p); m.dps = dir * Math.sign(sim.motorSpeed[p] || 1) * Math.abs(sim.motorSpeed[p]) * 10; },
-      motorStart(p, pct) { const v = clamp(pct) * 10; if (p === 'A' || p === 'AB') sim.mL.dps = v; if (p === 'B' || p === 'AB') sim.mR.dps = v; },
-      motorStop(p) { if (p === 'A' || p === 'AB') sim.mL.dps = 0; if (p === 'B' || p === 'AB') sim.mR.dps = 0; if (p !== 'A' && p !== 'B' && p !== 'AB') motorOf(p); },
+      motorStart(p, pct) { const v = clamp(pct) * 10; if (p === 'AB') { motorOf('A').dps = v; motorOf('B').dps = v; } else motorOf(p).dps = v; },
+      motorStop(p) { if (p === 'AB') { motorOf('A').dps = 0; motorOf('B').dps = 0; } else motorOf(p).dps = 0; },
       motorPosAbs: (p) => ((Math.round(motorOf(p).deg) % 360) + 360) % 360,
       motorPos: (p) => Math.round(motorOf(p).deg - (motorOf(p).rel0 || 0)),     // 相對位置（度）
       motorSetPos(p, v) { const m = motorOf(p); m.rel0 = m.deg - num(v); },
-      deviceReady: (p) => (p === 'A' || p === 'B' ? true : sim.ports[p] !== 'none'),
+      deviceReady: (p) => sim.ports[p] !== 'none',
       motorSpeedPct: (p) => Math.round((motorOf(p).cur || 0) / 10),
       motorVel: (p) => Math.round(motorOf(p).cur || 0),
 
@@ -261,7 +259,7 @@
       ticksMs: () => Math.round(sim.simTime * 1000),
 
       /* ----- 訊息、執行緒 ----- */
-      resetRun() { sim.msgs = {}; seen = {}; msgs = {}; handled = {}; killed = new Set(); sim.aborted = false; this.stopSounds(); },
+      resetRun() { sim.pairL = 'A'; sim.pairR = 'B'; sim.msgs = {}; seen = {}; msgs = {}; handled = {}; killed = new Set(); sim.aborted = false; this.stopSounds(); },
       setReceivers(map) { receivers = map || {}; },
       setThreads(n) { threadCount = n; },
       broadcast(m) { msgs[m] = (msgs[m] || 0) + 1; },

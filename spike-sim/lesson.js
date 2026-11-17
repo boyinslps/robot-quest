@@ -50,6 +50,24 @@
   const L = [];
   const lesson = (o) => { L.push(o); return o; };
 
+
+  const sockEl = (p) => document.querySelector('.sock[data-p="' + p + '"]');
+  const chipGuide = (from, to) => () => { const a = sockEl(from) && sockEl(from).querySelector('.pchip'), t = sockEl(to); return a && t ? { from: center(a), to: center(t) } : null; };
+  lesson({ id: 'ports', title: '認識接口', glyph: '0', color: '#8a93a6', icon: 'motor', view: 'comp', parts: ['motor:A'], ports: { A: 'motor', B: 'none', C: 'none', D: 'none', E: 'none', F: 'none' }, desc: '主機有 6 個接口。程式寫 A，零件就要插在 A。',
+    allow: ['sp_start', 'sp_motor_run'], steps: [
+      INFO('主機側邊有 6 個接口 A、B、C、D、E、F，每個都一樣，插哪個都可以。程式寫 A，零件就要插在 A。', '右邊最上面那一排，就是主機的接口。馬達現在插在 A。'),
+      HAT('把「當程式開始」拖到程式區。', 'sp_start', '在黃色的「事件」類別。'),
+      AFTER('把「轉動」接在下面。', 'sp_motor_run', 'sp_start', '在藍色的「馬達」類別。「A 轉動」的 A，就是馬達插的接口。'),
+      RUN('按 ▶ 執行，馬達插在 A，程式也寫 A。', null, (c) => { c.shared.deg0 = sim.mot.A.deg; }),
+      TRY('馬達轉了一圈！', (c) => Math.abs(sim.mot.A.deg - c.shared.deg0) >= 340, null, '看右邊的轉盤。'),
+      TRY('把馬達從 A 拖到 C 接口，就像拔掉再插到別的洞。', (c) => sim.ports.A !== 'motor' && sim.ports.C === 'motor', chipGuide('A', 'C'), '用滑鼠按住藍色的「馬達」，拖到 C。'),
+      RUN('再按一次 ▶。程式還是寫 A，可是馬達已經在 C 了。'),
+      INFO('馬達不會動！報錯台說「埠 A 沒有接馬達」。程式寫 A，零件就要插在 A。', '看一看左下角報錯台的訊息。'),
+      TRY('把馬達從 C 拖回 A。', (c) => sim.ports.A === 'motor', chipGuide('C', 'A'), '拖回 A 就對了。'),
+      RUN('再按一次 ▶，馬達又會轉了。'),
+      END('你學會了：每個接口都一樣，但程式裡寫的接口，要和零件插的接口一樣！'),
+    ] });
+
   lesson({ id: 'light', title: '母體燈', glyph: '1', color: '#b896f8', icon: 'light', view: 'comp', parts: ['hub'], desc: '讓主機的小燈亮出笑臉。',
     allow: ['sp_start', 'sp_light_image'], steps: [
       INFO('主機正面有 25 顆小燈。這一課，我們讓它亮出一張笑臉！', '右邊「元件模擬」裡的就是你的主機。'),
@@ -69,16 +87,16 @@
       HAT('把「當程式開始」拖到程式區。', 'sp_start', '在黃色的「事件」類別。'),
       AFTER('把「設定速度為」接在下面。', 'sp_motor_speed_set', 'sp_start', '在藍色的「馬達」類別。'),
       AFTER('再把「轉動」接在「設定速度為」下面。', 'sp_motor_run', 'sp_motor_speed_set', '「A 轉動 順時針 1 圈」：A 就是馬達接的埠。'),
-      RUN('按 ▶ 執行，看馬達轉一圈。', null, (c) => { c.shared.deg0 = sim.mL.deg; }),
-      TRY('馬達轉了一圈！看右邊的轉盤。', (c) => Math.abs(sim.mL.deg - c.shared.deg0) >= 340, null, '等馬達轉完。'),
+      RUN('按 ▶ 執行，看馬達轉一圈。', null, (c) => { c.shared.deg0 = sim.mot.A.deg; }),
+      TRY('馬達轉了一圈！看右邊的轉盤。', (c) => Math.abs(sim.mot.A.deg - c.shared.deg0) >= 340, null, '等馬達轉完。'),
       SET('把「設定速度為」的數字改大，例如 100。', 'sp_motor_speed_set', { input: 'P' }, (c) => c.num('sp_motor_speed_set', 'P') > 75, '數字越大，馬達轉得越快。'),
       RUN('再按一次 ▶，比比看是不是變快了。'),
       END('你學會了：數字越大，馬達轉得越快！'),
     ] });
 
-  lesson({ id: 'color', title: '顏色感測器', glyph: '3', color: '#34ccf1', icon: 'sensor', view: 'comp', parts: ['color:C'], desc: '看到紅色就讓主機亮燈。',
+  lesson({ id: 'color', title: '顏色感測器', glyph: '3', color: '#34ccf1', icon: 'sensor', view: 'comp', parts: ['color:A'], ports: { A: 'color' }, fields: { sp_when_color: { PORT: 'A' } }, desc: '看到紅色就讓主機亮燈。',
     allow: ['sp_when_color', 'sp_light_image'], steps: [
-      INFO('顏色感測器像眼睛，能認出面前東西的顏色。它接在 C 埠。', '右邊畫面下面的色塊，等一下會用到。'),
+      INFO('顏色感測器像眼睛，能認出面前東西的顏色。它接在 A 埠。', '右邊畫面下面的色塊，等一下會用到。'),
       HAT('把「當顏色是」拖到程式區。', 'sp_when_color', '在黃色的「事件」類別。看到某個顏色，才會執行下面的積木。'),
       SET('點「當顏色是」的顏色，選紅色。', 'sp_when_color', { field: 'COLOR' }, (c) => c.anyField('sp_when_color', 'COLOR', 'red'), '把顏色換成紅色。'),
       AFTER('把「亮起」接在下面。', 'sp_light_image', 'sp_when_color', '在紫色的「燈光」類別。'),
@@ -90,9 +108,9 @@
       END('你學會了：換積木上的顏色，感測器就認不同的顏色！'),
     ] });
 
-  lesson({ id: 'dist', title: '距離感測器', glyph: '4', color: '#34ccf1', icon: 'sensor', view: 'comp', parts: ['dist:D'], desc: '東西靠近就讓主機嗶一聲。',
+  lesson({ id: 'dist', title: '距離感測器', glyph: '4', color: '#34ccf1', icon: 'sensor', view: 'comp', parts: ['dist:A'], ports: { A: 'distance' }, fields: { sp_when_dist: { PORT: 'A' } }, desc: '東西靠近就讓主機嗶一聲。',
     allow: ['sp_when_dist', 'sp_beep'], steps: [
-      INFO('距離感測器能量出前面的東西有多遠。它接在 D 埠。', '右邊灰色的物體可以左右拖動。'),
+      INFO('距離感測器能量出前面的東西有多遠。它接在 A 埠。', '右邊灰色的物體可以左右拖動。'),
       HAT('把「當距離」拖到程式區。', 'sp_when_dist', '在黃色的「事件」類別。東西比數字更近，才會執行下面的積木。'),
       AFTER('把「播放嗶聲」接在下面。', 'sp_beep', 'sp_when_dist', '在紫色的「聲音」類別。'),
       RUN('按 ▶ 執行，程式會等東西靠近。'),
@@ -103,17 +121,17 @@
       END('你學會了：「當距離」的數字越大，越遠就會有反應！'),
     ] });
 
-  lesson({ id: 'force', title: '力傳感器', glyph: '5', color: '#34ccf1', icon: 'sensor', view: 'comp', parts: ['motor:A', 'force:E'], desc: '按下去馬達轉，放開就停。',
+  lesson({ id: 'force', title: '力傳感器', glyph: '5', color: '#34ccf1', icon: 'sensor', view: 'comp', parts: ['motor:A', 'force:B'], ports: { A: 'motor', B: 'force' }, fields: { sp_when_force: { PORT: 'B' } }, desc: '按下去馬達轉，放開就停。',
     allow: ['sp_when_force', 'sp_motor_start', 'sp_motor_stop'], steps: [
-      INFO('力傳感器就像按鈕。這一課：按下去馬達轉，放開就停。馬達接 A 埠，力傳感器接 E 埠。', '右邊有兩個零件。'),
+      INFO('力傳感器就像按鈕。這一課：按下去馬達轉，放開就停。馬達接 A 埠，力傳感器接 B 埠。', '右邊有兩個零件。'),
       HAT('把「當力傳感器」拖到程式區。', 'sp_when_force', '在黃色的「事件」類別。預設是「被按下」。'),
       AFTER('把「開始轉動」接在下面。', 'sp_motor_start', 'sp_when_force', '在藍色的「馬達」類別。'),
       DRAG('再拖一個「當力傳感器」到旁邊，放在第一組的下面。', 'sp_when_force', { free: true }, (c) => c.blocks('sp_when_force').length >= 2, '這一組負責「放開」的時候。'),
       SET('把第二個「當力傳感器」改成「被放開」。', 'sp_when_force', { field: 'STATE', pick: (c) => c.blocks('sp_when_force')[1] }, (c) => c.anyField('sp_when_force', 'STATE', 'up'), '點它的選項，選「被放開」。'),
       DRAG('把「停止馬達」接在「被放開」的下面。', 'sp_motor_stop', { after: 'sp_when_force' }, (c) => c.blocks('sp_when_force').some((b) => b.getFieldValue('STATE') === 'up' && b.getNextBlock() && b.getNextBlock().type === 'sp_motor_stop'), '要接在第二組，不是第一組。'),
       RUN('按 ▶ 執行。'),
-      TRY('用滑鼠按住力傳感器的黑色圓鈕，看馬達轉起來！', (c) => c.running() && sim.forceDeci() > 0 && sim.mL.dps !== 0, pressGuide, '按住不放。', () => { }),
-      TRY('放開滑鼠，馬達就停了。', (c) => c.running() && sim.forceDeci() === 0 && sim.mL.dps === 0, pressGuide, '放開圓鈕。'),
+      TRY('用滑鼠按住力傳感器的黑色圓鈕，看馬達轉起來！', (c) => c.running() && sim.forceDeci() > 0 && sim.mot.A.dps !== 0, pressGuide, '按住不放。', () => { }),
+      TRY('放開滑鼠，馬達就停了。', (c) => c.running() && sim.forceDeci() === 0 && sim.mot.A.dps === 0, pressGuide, '放開圓鈕。'),
       END('你學會了：用兩個「當」積木，分別管按下和放開！'),
     ] });
 
@@ -191,9 +209,9 @@
   /* ---------- 工具箱：只留這一課需要的積木 ---------- */
   const CAT_OF = {};
   for (const c of SP.toolbox.contents) if (c.kind === 'category' && c.contents) for (const b of c.contents) CAT_OF[b.type] = c.name;
-  function applyToolbox(allow) {
+  function applyToolbox(allow, fields) {
     const set = new Set(allow), cats = [];
-    for (const c of SP.toolbox.contents) { if (c.kind !== 'category' || !c.contents) continue; const items = c.contents.filter((b) => set.has(b.type)); if (items.length) cats.push({ ...c, contents: items }); }
+    for (const c of SP.toolbox.contents) { if (c.kind !== 'category' || !c.contents) continue; const items = c.contents.filter((b) => set.has(b.type)).map((b) => (fields && fields[b.type] ? { ...b, fields: { ...(b.fields || {}), ...fields[b.type] } } : b)); if (items.length) cats.push({ ...c, contents: items }); }
     ws.updateToolbox({ kind: 'categoryToolbox', contents: cats });
     const tb = ws.getToolbox(); if (tb && tb.showAll) { tb.showAll(false); const first = tb._categories()[0]; if (first) tb.setSelectedItem(first); }
   }
@@ -307,7 +325,8 @@
     try { U.restore({ workspace: { blocks: { languageVersion: 0, blocks: [] } }, name: l.title, scene: l.scene || 'blank' }); } finally { SP.lesson.starting = false; }
     cur = l; steps = l.steps; doneSet = new Set(); active = true; SP.compForce = l.parts || [];
     document.body.classList.add('has-lesson'); card.hidden = false;
-    $('home').hidden = true; applyToolbox(l.allow); SP.showView(l.view || 'field'); Blockly.svgResize(ws);
+    Object.assign(sim.ports, l.ports || {}); U.refreshPortSelects();
+    $('home').hidden = true; applyToolbox(l.allow, l.fields); SP.showView(l.view || 'field'); Blockly.svgResize(ws);
     if (U.mode() !== 'blocks') U.setMode('blocks');
     show(0);
   }

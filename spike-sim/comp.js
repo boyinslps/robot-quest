@@ -27,7 +27,7 @@
     sp_force: 'force', sp_pressed_is: 'force', sp_force_val: 'force', sp_when_force: 'force',
   };
   const DEFAULT_PORT = { color: 'C', dist: 'D', force: 'E' };
-  const SENSOR_PORTS = ['C', 'D', 'E', 'F'];
+  const ALL_PORTS = ['A', 'B', 'C', 'D', 'E', 'F'], SENSOR_PORTS = ALL_PORTS;
 
   function detect() {
     const found = { hub: false, gyro: false, motors: new Set(), color: new Set(), dist: new Set(), force: new Set() };
@@ -38,8 +38,11 @@
         while ((m = re.exec(src))) { any = true; if (valid.includes(m[1])) set.add(m[1]); }
         if (!any && new RegExp('\\b' + mod + '\\.\\w+').test(src)) set.add(def);
       };
-      port('motor', found.motors, 'A', ['A', 'B']);
-      if (/\bmotor_pair\./.test(src)) { found.motors.add('A'); found.motors.add('B'); }
+      port('motor', found.motors, 'A', ALL_PORTS);
+      if (/\bmotor_pair\./.test(src)) {
+        const m = /motor_pair\.pair\([^)]*?port\.([A-F])[^)]*?port\.([A-F])/.exec(src);
+        if (m) { found.motors.add(m[1]); found.motors.add(m[2]); } else { found.motors.add('A'); found.motors.add('B'); }
+      }
       port('color_sensor', found.color, 'C', SENSOR_PORTS); port('distance_sensor', found.dist, 'D', SENSOR_PORTS); port('force_sensor', found.force, 'E', SENSOR_PORTS);
       if (/\b(light_matrix|button|light)\.\w+/.test(src)) found.hub = true;
       if (/\bmotion_sensor\.\w+/.test(src)) found.gyro = true;
@@ -50,14 +53,15 @@
         const t = b.type, p = b.getFieldValue && b.getFieldValue('PORT');
         if (T_HUB.has(t)) found.hub = true;
         if (T_GYRO.has(t)) found.gyro = true;
-        if (T_MOVE.has(t)) { found.motors.add('A'); found.motors.add('B'); }
-        if (t.startsWith('sp_motor_') && (p === 'A' || p === 'B')) found.motors.add(p);
+        if (T_MOVE.has(t)) { found.motors.add(sim.pairL); found.motors.add(sim.pairR); }
+        if (t === 'sp_set_pair') { const m = /^([A-F])\+([A-F])$/.exec(b.getFieldValue('PAIR') || ''); if (m) { found.motors.add(m[1]); found.motors.add(m[2]); } }
+        if (t.startsWith('sp_motor_') && ALL_PORTS.includes(p)) found.motors.add(p);
         const k = T_SENSOR[t]; if (k && SENSOR_PORTS.includes(p)) found[k].add(p);
       }
     }
     const parts = [];
     if (found.hub) parts.push('hub');
-    for (const p of ['A', 'B']) if (found.motors.has(p)) parts.push('motor:' + p);
+    for (const p of ALL_PORTS) if (found.motors.has(p)) parts.push('motor:' + p);
     for (const k of ['color', 'dist', 'force']) for (const p of [...found[k]].sort()) parts.push(k + ':' + p);
     if (found.gyro) parts.push('gyro');
     return parts;
@@ -105,9 +109,9 @@
 
   /* ---------- 馬達（用滑鼠轉動） ---------- */
   function motorPart(p) {
-    const m = () => (p === 'A' ? sim.mL : sim.mR);
+    const m = () => sim.mot[p];
     const f = frame('馬達', '#0090f5', p, '用滑鼠在轉盤上拖，就像用手轉馬達。');
-    f.root.querySelector('.part-h').firstChild.nextSibling.textContent = p === 'A' ? '馬達（左輪）' : '馬達（右輪）';
+    const title = f.root.querySelector('.part-h').firstChild.nextSibling;
     const svg = S('svg', { viewBox: '0 0 240 240', preserveAspectRatio: 'xMidYMid meet' });
     const ring = S('circle', { cx: 120, cy: 120, r: 108, fill: '#0090f5', stroke: '#0069b3', 'stroke-width': 4 }); svg.append(ring, S('circle', { cx: 120, cy: 120, r: 84, fill: '#eaf4ff' }));
     for (let i = 0; i < 36; i++) { const a = rad(i * 10), big = i % 9 === 0; svg.append(S('line', { x1: 120 + 100 * Math.sin(a), y1: 120 - 100 * Math.cos(a), x2: 120 + (big ? 88 : 93) * Math.sin(a), y2: 120 - (big ? 88 : 93) * Math.cos(a), stroke: '#fff', 'stroke-width': big ? 3 : 1.5 })); }
@@ -119,10 +123,13 @@
     svg.append(rotor);
     let last = null;
     const ang = (e) => { const b = ring.getBoundingClientRect(); return Math.atan2(e.clientX - (b.left + b.width / 2), -(e.clientY - (b.top + b.height / 2))) * 180 / Math.PI; };
-    dragger(svg, { down: (e) => { last = ang(e); rotor.classList.add('grabbing'); }, move: (e) => { const a = ang(e); let d = a - last; if (d > 180) d -= 360; if (d < -180) d += 360; m().deg += d; m().cur = 0; last = a; }, up: () => { last = null; rotor.classList.remove('grabbing'); } });
+    dragger(svg, { down: (e) => { if (sim.ports[p] !== 'motor') return false; last = ang(e); rotor.classList.add('grabbing'); }, move: (e) => { const a = ang(e); let d = a - last; if (d > 180) d -= 360; if (d < -180) d += 360; m().deg += d; m().cur = 0; last = a; }, up: () => { last = null; rotor.classList.remove('grabbing'); } });
     f.body.append(svg); f.chip('pos', '位置'); f.chip('turn', '共轉'); f.chip('v', '轉速');
     return { id: 'motor:' + p, root: f.root, tick() {
+      title.textContent = p === sim.pairL ? '馬達（左輪）' : p === sim.pairR ? '馬達（右輪）' : '馬達';
+      const ok = sim.ports[p] === 'motor'; f.root.classList.toggle('warn', !ok);
       const d = m().deg; rotor.setAttribute('transform', `rotate(${(d % 360 + 360) % 360} 120 120)`);
+      if (!ok) { f.chips.pos(sim.ports[p] === 'none' ? '這個埠沒有接馬達' : '這個埠接的不是馬達'); f.chips.turn('—'); f.chips.v('—'); return; }
       f.chips.pos(((Math.round(d) % 360) + 360) % 360 + '°'); f.chips.turn((d / 360).toFixed(2) + ' 圈'); f.chips.v(Math.round(m().cur || 0) + '°/秒');
     } };
   }
@@ -246,15 +253,48 @@
     }, destroy() { ro.disconnect(); } };
   }
 
+  /* ---------- 主機接口：把零件插上、拔掉、換位置（全部用滑鼠拖） ---------- */
+  const DEVNAME = { motor: '馬達', color: '顏色', distance: '距離', force: '力' };
+  const strip = H('div', { class: 'portstrip' });
+  const socks = {};
+  for (const p of ALL_PORTS) { const hold = H('div', { class: 'hold' }); const sk = H('div', { class: 'sock', 'data-p': p }, H('span', { class: 'sl', text: p }), hold); socks[p] = { sk, hold, t: '' }; strip.append(sk); }
+  const tray = H('div', { class: 'ptray' }, H('span', { class: 'tl', text: '拖到接口插上' }));
+  for (const t of ['motor', 'color', 'distance', 'force']) { const c = H('div', { class: 'pchip ' + t, 'data-t': t, text: DEVNAME[t] }); tray.append(c); chipDrag(c, t, null); }
+  strip.append(tray);
+  function chipDrag(el, type, from) {
+    el.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return; e.preventDefault();
+      const ghost = H('div', { class: 'pchip drag ' + type, text: DEVNAME[type] }); document.body.append(ghost);
+      const put = (ev) => { ghost.style.left = ev.clientX + 'px'; ghost.style.top = ev.clientY + 'px'; }; put(e);
+      if (from) el.classList.add('lifted');
+      const move = (ev) => { put(ev); const s = document.elementFromPoint(ev.clientX, ev.clientY), k = s && s.closest('.sock'); for (const q of ALL_PORTS) socks[q].sk.classList.toggle('over', !!k && k.dataset.p === q); };
+      const up = (ev) => {
+        window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up);
+        ghost.remove(); el.classList.remove('lifted'); for (const q of ALL_PORTS) socks[q].sk.classList.remove('over');
+        const s = ev.type === 'pointercancel' ? null : document.elementFromPoint(ev.clientX, ev.clientY), k = s && s.closest('.sock');
+        if (k) { const to = k.dataset.p; if (from) { if (to !== from) { const other = sim.ports[to]; sim.ports[to] = type; sim.ports[from] = other; } } else sim.ports[to] = type; }
+        else if (from) sim.ports[from] = 'none';               // 拖到外面＝拔掉
+        U.refreshPortSelects(); renderStrip();
+      };
+      window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
+    });
+  }
+  function renderStrip() {
+    for (const p of ALL_PORTS) {
+      const t = sim.ports[p], o = socks[p]; if (o.t === t) continue; o.t = t; o.hold.textContent = ''; o.sk.classList.toggle('full', t !== 'none');
+      if (t !== 'none') { const c = H('div', { class: 'pchip ' + t, text: DEVNAME[t] }); o.hold.append(c); chipDrag(c, t, p); }
+    }
+  }
+
   /* ---------- 版面：零件多就分割 ---------- */
   const root = $('tab-comp'), grid = H('div', { class: 'comp-grid' }), empty = H('div', { class: 'comp-empty' }, H('div', {}, H('b', { text: '還沒有用到會動的零件' }), '到左邊拖一個積木過來，例如「馬達 轉動」、「當 力傳感器 被按下」，',
     H('br'), '這裡就會出現對應的零件，可以直接用滑鼠玩。'));
-  root.append(grid, empty);
+  root.append(strip, grid, empty);
   const make = (id) => { const [k, p] = id.split(':'); return k === 'hub' ? hubPart() : k === 'motor' ? motorPart(p) : k === 'color' ? colorPart(p) : k === 'dist' ? distPart(p) : k === 'force' ? forcePart(p) : gyroPart(); };
   let panes = new Map(), sig = '';
   function connect(ids) {
     let changed = false;
-    for (const id of ids) { const [k, p] = id.split(':'); const type = { color: 'color', dist: 'distance', force: 'force' }[k]; if (type && sim.ports[p] === 'none') { sim.ports[p] = type; changed = true; } }
+    for (const id of ids) { if (panes.has(id)) continue; const [k, p] = id.split(':'); const type = { motor: 'motor', color: 'color', dist: 'distance', force: 'force' }[k]; if (type && sim.ports[p] === 'none') { sim.ports[p] = type; changed = true; } }
     if (changed) U.refreshPortSelects();
   }
   function render(ids) {
@@ -268,6 +308,7 @@
   function refresh() {
     const ids = [...new Set([...detect(), ...(SP.compForce || [])])].sort((x, y) => orderOf(x) - orderOf(y)), s = ids.join('|');
     const badge = $('comp-badge'); badge.hidden = !ids.length; badge.textContent = ids.length;
+    renderStrip();
     if (s !== sig) { sig = s; render(ids); }
   }
   setInterval(refresh, 300);
@@ -284,7 +325,7 @@
   }
   function showView(v) {
     if (v === view) return; view = v;
-    document.querySelectorAll('#viewtabs button').forEach((b) => b.classList.toggle('on', b.dataset.view === v));
+    document.querySelectorAll('#viewtabs button[data-view]').forEach((b) => b.classList.toggle('on', b.dataset.view === v));
     $('tab-field').hidden = v !== 'field'; root.hidden = v !== 'comp';
     if (v === 'comp') { sim.lifted = true; refresh(); cancelAnimationFrame(raf); loop(); }
     else {
@@ -293,7 +334,7 @@
       setTimeout(() => window.dispatchEvent(new Event('resize')), 30);
     }
   }
-  document.querySelectorAll('#viewtabs button').forEach((b) => { b.onclick = () => showView(b.dataset.view); });
+  document.querySelectorAll('#viewtabs button[data-view]').forEach((b) => { b.onclick = () => showView(b.dataset.view); });
   SP.showView = showView; SP.compParts = () => [...panes.keys()];
   refresh();
 })(window.SP = window.SP || {});

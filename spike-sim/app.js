@@ -45,6 +45,19 @@
   };
   $('speed').onchange = () => { sim.mul = Number($('speed').value); };
   $('btn-reset').onclick = () => { stopProgram(); sim.resetPose(); };
+  /* 清除數據：把累積的讀值全部歸零（不動車子的位置、不停程式、不動積木）。
+     LEGO 沒有「一次清全部」的積木，官方是分開的重設積木；這裡把它們一次做完。 */
+  function clearData() {
+    for (const m of Object.values(sim.mot)) { m.deg = 0; m.rel0 = 0; }          // 馬達：位置、相對位置、共轉圈數
+    sim.yawOff = sim.th;                                                          // 偏航角 = 0
+    sim.timerOff = sim.simTime;                                                   // 計時器 = 0
+    sim.led.fill(0); sim.displayText = ''; sim.matrixRot = 0; sim.matrixBright = 100; sim.powerColor = -1;   // 主機的燈與文字
+    sim.distLights = [0, 0, 0, 0];                                                // 距離感測器的燈
+    sim.hand.taps = 0; sim.hand.gesture = null;                                   // 輕拍次數、手勢
+    sim.clearTrail();                                                             // 行駛軌跡
+    $('console').textContent = ''; clearErrors();                                 // 輸出訊息與報錯
+  }
+  $('btn-cleardata').onclick = clearData;
   $('btn-rotl').onclick = () => sim.rotateBy(-15);
   $('btn-rotr').onclick = () => sim.rotateBy(15);
   $('chk-trail').onchange = (e) => { sim.penOn = e.target.checked; };
@@ -203,22 +216,17 @@
   $('fs-run').onclick = () => $('btn-run').click(); $('fs-stop').onclick = () => $('btn-stop').click();
 
   /* ---------- 主機與埠 ---------- */
-  const DEV = [['none', '（未連接）'], ['color', '顏色感測器'], ['distance', '距離感測器'], ['force', '力感測器']];
+  const DEV = [['none', '（未連接）'], ['motor', '馬達'], ['color', '顏色感測器'], ['distance', '距離感測器'], ['force', '力感測器']];
   const portEl = {};
   function buildPort(p, side) {
     const row = document.createElement('div'); row.className = 'port';
     const badge = document.createElement('div'); badge.className = 'pbadge'; badge.textContent = p;
     const info = document.createElement('div'); info.className = 'pinfo';
     const val = document.createElement('div'); val.className = 'pval';
-    if (p === 'A' || p === 'B') {
-      const nm = document.createElement('div'); nm.className = 'pname'; nm.textContent = p === 'A' ? '馬達（左輪）' : '馬達（右輪）';
-      info.append(nm, val);
-    } else {
-      const sel = document.createElement('select');
-      DEV.forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; sel.appendChild(o); });
-      sel.value = sim.ports[p]; sel.onchange = () => { sim.ports[p] = sel.value; autosave(); };
-      portEl[p + 'sel'] = sel; info.append(sel, val);
-    }
+    const sel = document.createElement('select');
+    DEV.forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; sel.appendChild(o); });
+    sel.value = sim.ports[p]; sel.onchange = () => { sim.ports[p] = sel.value; autosave(); };
+    portEl[p + 'sel'] = sel; info.append(sel, val);
     portEl[p] = val; row.append(badge, info);
     $(side).appendChild(row);
   }
@@ -229,10 +237,9 @@
   const CN = { black: '黑色', white: '白色', red: '紅色', yellow: '黃色', green: '綠色', blue: '藍色', none: '無' };
   function refreshHub() {
     const posTxt = (m) => '位置 ' + (((Math.round(m.deg) % 360) + 360) % 360) + '°（共轉 ' + (m.deg / 360).toFixed(1) + ' 圈）';
-    portEl.A.textContent = posTxt(sim.mL); portEl.B.textContent = posTxt(sim.mR);
-    for (const p of ['C', 'D', 'E', 'F']) {
+    for (const p of 'ABCDEF') {
       const t = sim.ports[p];
-      portEl[p].textContent = t === 'color' ? CN[sim.color()] + '／反射光 ' + sim.light() + '%'
+      portEl[p].textContent = t === 'motor' ? posTxt(sim.mot[p]) : t === 'color' ? CN[sim.color()] + '／反射光 ' + sim.light() + '%'
         : t === 'distance' ? sim.distance() + ' 公分' : t === 'force' ? (sim.pressed() ? '被按下' : '未按下') : '';
     }
     const r = sim.matrixRot;
@@ -263,8 +270,8 @@
   function setRunning(r) { running = r; $('btn-run').hidden = r; $('btn-stop').hidden = !r; $('fs-run').hidden = r; $('fs-stop').hidden = !r; }
   function resetHubState() {      // 程式一開始：回到官方預設值
     api.resetRun(); sim.yawOff = sim.th; sim.timerOff = sim.simTime; sim.lastMoveT = sim.simTime;
-    sim.speedPct = 50; sim.motorSpeed = { A: 75, B: 75 }; sim.cmPerRot = 17.5;
-    sim.mL.rel0 = sim.mL.deg; sim.mR.rel0 = sim.mR.deg;      // 相對位置：程式開始後轉了幾度
+    sim.speedPct = 50; sim.motorSpeed = { A: 75, B: 75, C: 75, D: 75, E: 75, F: 75 }; sim.cmPerRot = 17.5;
+    for (const m of Object.values(sim.mot)) m.rel0 = m.deg;      // 相對位置：程式開始後轉了幾度
     sim.matrixBright = 100; sim.matrixRot = 0; sim.powerColor = -1; sim.led.fill(0); sim.displayText = '';
   }
   async function runProgram() {
@@ -330,6 +337,7 @@
   };
   const MOTOR_TYPES = new Set(['sp_motor_run', 'sp_motor_goto', 'sp_motor_start', 'sp_motor_stop', 'sp_motor_speed_set', 'sp_motor_pos', 'sp_motor_speed', 'sp_motor_relpos', 'sp_motor_setrel', 'sp_motor_turn']);
   const SENSOR_NAME = { color: '顏色感測器', distance: '距離感測器', force: '力感測器' };
+  const DEVNAME = { motor: '馬達', ...SENSOR_NAME };
   const isHat = (b) => b.type === 'sp_start' || b.type.startsWith('sp_when_');
   function showTab(t) {
     $('tab-out').classList.toggle('on', t === 'out'); $('tab-err').classList.toggle('on', t === 'err');
@@ -371,8 +379,8 @@
     tops.forEach((b) => { if (!isHat(b) && b.type !== 'procedures_defnoreturn' && !b.isShadow()) out.push({ level: 'warn', msg: '這個積木沒有接在事件積木下面，不會被執行。', blockId: b.id }); });
     ws.getAllBlocks(false).forEach((b) => {
       const need = SENSOR_TYPE[b.type], p = need && b.getFieldValue('PORT');
-      if (MOTOR_TYPES.has(b.type) && !['A', 'B'].includes(b.getFieldValue('PORT'))) out.push({ level: 'error', msg: '埠 ' + b.getFieldValue('PORT') + ' 沒有馬達（模擬器：A＝左輪、B＝右輪）。', blockId: b.id });
-      if (need && sim.ports[p] !== need) out.push({ level: 'error', msg: '埠 ' + p + ' 沒有連接' + SENSOR_NAME[need] + '（請到「主機與裝置」設定）。', blockId: b.id });
+      if (MOTOR_TYPES.has(b.type) && sim.ports[b.getFieldValue('PORT')] !== 'motor') out.push({ level: 'error', msg: '埠 ' + b.getFieldValue('PORT') + (sim.ports[b.getFieldValue('PORT')] === 'none' ? ' 沒有接馬達' : ' 接的是' + DEVNAME[sim.ports[b.getFieldValue('PORT')]] + '，不是馬達') + '（請到「元件模擬」的接口或「主機與裝置」設定）。', blockId: b.id });
+      if (need && sim.ports[p] !== need) out.push({ level: 'error', msg: '埠 ' + p + (sim.ports[p] === 'none' ? ' 沒有連接' + SENSOR_NAME[need] : ' 接的是' + DEVNAME[sim.ports[p]] + '，不是' + SENSOR_NAME[need]) + '（請到「元件模擬」的接口或「主機與裝置」設定）。', blockId: b.id });
       b.inputList.forEach((inp) => {
         const c = inp.connection;
         if (inp.type === 1 && c && !c.targetBlock() && c.getCheck() && c.getCheck().includes('Boolean')) out.push({ level: 'warn', msg: '缺少條件：這個積木的「條件」是空的。', blockId: b.id });
@@ -437,7 +445,9 @@
     stopProgram(); ws.clear();
     if (d.workspace) Blockly.serialization.workspaces.load(d.workspace, ws);
     $('proj-name').value = d.name || '未命名專案';
-    if (d.ports) for (const p of ['C', 'D', 'E', 'F']) if (d.ports[p]) { sim.ports[p] = d.ports[p]; portEl[p + 'sel'].value = d.ports[p]; }
+    Object.assign(sim.ports, { A: 'motor', B: 'motor', C: 'color', D: 'distance', E: 'force', F: 'none' });
+    if (d.ports) for (const p of 'ABCDEF') if (d.ports[p]) sim.ports[p] = d.ports[p];
+    for (const p of 'ABCDEF') portEl[p + 'sel'].value = sim.ports[p];
     applySettings(d.settings || {});
     pySrc.value = d.py || ''; pyDirty = !!d.pyDirty && !!d.py; clearErrors(); showTab('out');
     setMode(d.mode === 'python' ? 'python' : 'blocks');
@@ -519,10 +529,10 @@
   SP.ws = ws; SP.sim = sim; SP.run = runProgram;
   SP.ui = {      // 給 bench.js（機構單獨測試面板）用
     sim, api, ws, say, setMode, autosave, pySrc, POWER_CSS,
-    isRunning: () => running, isPyDirty: () => pyDirty, mode: () => mode, restore,
+    isRunning: () => running, isPyDirty: () => pyDirty, mode: () => mode, restore, clearData,
     rebuildHome() { let sv = null; try { sv = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { /* 略 */ } buildHome(sv); },
     loadPython(code) { pySrc.value = code; pyDirty = true; $('py-note').textContent = '已放入範例（不會變回積木）'; setMode('python'); updateGutter(); autosave(); },
-    refreshPortSelects() { for (const p of ['C', 'D', 'E', 'F']) if (portEl[p + 'sel']) portEl[p + 'sel'].value = sim.ports[p]; autosave(); },
+    refreshPortSelects() { for (const p of 'ABCDEF') if (portEl[p + 'sel']) portEl[p + 'sel'].value = sim.ports[p]; autosave(); },
   };
   if (SP.onUiReady) SP.onUiReady();
 })(window.SP = window.SP || {});

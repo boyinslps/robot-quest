@@ -20,10 +20,7 @@ def _pn(p):
     return "ABCDEF"[p]
 
 def _mpn(p):
-    n = _pn(p)
-    if n not in ("A", "B"):
-        raise ValueError("埠 %s 沒有馬達（模擬器：A＝左輪、B＝右輪）" % n)
-    return n
+    return _pn(p)
 
 def _unsupported(what):
     def f(*a, **k):
@@ -194,16 +191,15 @@ _mod("motor", **{k: getattr(motor, k) for k in dir(motor) if not k.startswith("_
 class _MotorPair:
     PAIR_1 = 0; PAIR_2 = 1; PAIR_3 = 2
     def __init__(self):
-        self._pairs = set()
+        self._pairs = {}
     def pair(self, pair, left_motor, right_motor):
-        if (left_motor, right_motor) != (0, 1):
-            raise ValueError("模擬器目前只支援 motor_pair.pair(..., port.A, port.B)（A＝左輪、B＝右輪）")
-        self._pairs.add(pair)
+        self._pairs[pair] = _pn(left_motor) + "+" + _pn(right_motor)
     def unpair(self, pair):
-        self._pairs.discard(pair)
+        self._pairs.pop(pair, None)
     def _chk(self, pair):
         if pair not in self._pairs:
             raise RuntimeError("請先用 motor_pair.pair(motor_pair.PAIR_1, port.A, port.B) 設定馬達組")
+        _sp.setPair(self._pairs[pair])
     def move(self, pair, steering, *, velocity=360, acceleration=1000):
         self._chk(pair); _sp.mpMove(steering, velocity)
     async def move_for_degrees(self, pair, degrees, steering, *, velocity=360, stop=1, acceleration=1000, deceleration=1000):
@@ -391,6 +387,7 @@ async def _spike_exec(src):
       mpTankDeg: (d, l, r) => api.tankDegrees(d, pct(l), pct(r)),
       mpTankTime: async (ms, l, r) => { api.tank(pct(l), pct(r)); await api.wait(Number(ms) / 1000); api.stop(); },
       mpMoveDeg: (d, st, v) => api.moveDegrees(d, st, pct(v)), mpMoveTime: (ms, st, v) => api.moveTime(ms, st, pct(v)),
+      setPair: (s) => api.setPair(s),
       motorRun: (p, v) => api.motorStart(p, pct(v)),
       motorDeg: (p, d, v) => api.motorTurnAt(p, Number(d) * (v < 0 ? -1 : 1), Math.abs(pct(v))),
       motorTime: async (p, ms, v) => { api.motorStart(p, pct(v)); await api.wait(Number(ms) / 1000); api.motorStop(p); },
