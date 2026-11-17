@@ -89,6 +89,7 @@
 - 距離感測器用 5 條射線偵測，顏色感測器讀場地底圖像素。
 - 原始 yaw（`motion_sensor.tilt_angles()[0]`）為逆時針為正，依據 LEGO 範例推論，**尚未用真機驗證**；積木的「轉向角度」預設順時針為正，可在設定改。
 - 執行 Python 前會自動在 `while`／`for` 迴圈開頭補上 `await`，所以 LEGO 範例裡沒寫 `await` 的迴圈也不會讓網頁凍結（但不在 `async def` 裡的迴圈無法處理）。
+- **官方入門頁的寫法可以直接貼**（2026-11-17）：`time.sleep_ms(x)` 單獨一行時，執行前自動改成 `await`（最外層、`async def`、以及有用到它的一般 `def` 都會處理）；`motor.run_for_degrees`、`motor.run_for_time`、`light_matrix.write`、`sound.beep`、`motor_pair.move_for_*` 這類「可等待」的函式，不寫 `await` 也會立刻開始做、程式繼續往下，寫了 `await` 才會等它做完；程式最後一行跑完後，會等已經開始的動作（馬達、燈陣文字）做完才結束。`sound.stop()` 會中止還在響的嗶聲。
 
 ## 檔案
 
