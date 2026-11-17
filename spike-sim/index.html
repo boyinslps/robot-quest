@@ -19,10 +19,14 @@
     <p class="home-sub">用積木寫程式，在模擬場地裡看機器人怎麼動。</p>
     <h2>開始</h2>
     <div class="tiles" id="tiles-start"></div>
-    <h2>範例專案</h2>
+    <h2>學習任務（跟著做）</h2>
+    <p class="home-note">一步一步照提示拖積木，做完就學會一個零件或一個動作。</p>
+    <div class="tiles" id="tiles-lesson"></div>
+    <h2>Python 範例</h2>
     <div class="tiles" id="tiles-sample"></div>
   </div>
 </div>
+<div id="lguide" hidden aria-hidden="true"><div class="g-ghost"></div><div class="g-ring"></div><svg class="g-hand" viewBox="0 0 64 80" width="52" height="64"><path d="M26 4c-4 0-6.5 3-6.5 6.5V38l-5.5-5c-3-2.700-8-.5-6 4l11 24c3 6 8 10 16 10h6c10 0 17-7 17-17V38c0-4-3-6-6-6-1.500 0-3 .6-4 1.800C47.500 31 45 29.500 42.500 29.500c-1.800 0-3.200.6-4.200 1.600C37.400 28.500 35 27 32.500 27c-.5 0-1 0-1.500.2V10.500C31 7 29.500 4 26 4z" fill="#fff" stroke="#1d2433" stroke-width="3" stroke-linejoin="round"/></svg></div>
 <div id="app">
   <header class="topbar">
     <button class="home-btn" id="btn-home" type="button" title="回到首頁" aria-label="回到首頁"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" fill="#3d4357"/></svg></button>
@@ -63,6 +67,13 @@
     </section>
 
     <aside class="side">
+      <section class="lesson-card" id="lesson-card" hidden aria-live="polite">
+        <div class="lc-head"><span class="lc-ic cat-icon" id="lc-ic"></span><span class="lc-title" id="lc-title"></span><button class="lc-exit" id="lc-exit" type="button" title="離開這個任務">離開</button></div>
+        <div class="lc-main"><div class="lc-num"><b id="lc-n">01</b><span id="lc-t">/06</span></div><div class="lc-text"><div class="lc-say" id="lc-say"></div><div class="lc-hint" id="lc-hint"></div></div></div>
+        <div class="lc-ok" id="lc-ok" hidden>做到了！</div>
+        <div class="lc-end" id="lc-end" hidden><button type="button" class="pill" id="lc-home">回首頁選下一個任務</button><button type="button" class="pill" id="lc-again">再做一次</button></div>
+        <div class="lc-foot"><button class="lc-arrow" id="lc-prev" type="button" aria-label="上一步">‹</button><div class="lc-dots" id="lc-dots"></div><button class="lc-arrow" id="lc-next" type="button" aria-label="下一步">›</button></div>
+      </section>
       <nav class="viewtabs" id="viewtabs" aria-label="模擬畫面">
         <button type="button" data-view="field" class="on">場地模擬</button>
         <button type="button" data-view="comp">元件模擬<span class="badge" id="comp-badge" hidden>0</span></button>
@@ -184,6 +195,7 @@
     <li><b>布置場地</b>：按「布置場地」可以拖曳畫出方塊（機器人推得動）、牆、色紙、黑線膠帶，用「橡皮擦」刪除；「設為起點」會把機器人現在的位置當起點。「全螢幕」可以放大場地，上課投影很方便。「3D 車子」可以旋轉、縮放小車，程式跑起來輪子會跟著轉。</li>
     <li><b>感測器位置</b>：顏色感測器在機器人前方底部，距離感測器在最前方中央，力感測器是前方的碰撞探針。</li>
     <li><b>轉向角度</b>：順時針為正，範圍 −180～179。程式一開始會自動歸零。</li>
+    <li><b>學習任務</b>：首頁的「學習任務」會一步一步帶你拖積木。看右上角的「目前任務」，橘色框和小手會指出要拿哪一塊、放在哪裡；做對了會自動換下一步。</li>
     <li><b>場地模擬／元件模擬</b>：右邊上方可以切換。「場地模擬」看車子在場地上跑；「元件模擬」會把你積木用到的零件（馬達、感測器、母體燈、陀螺儀）放出來，直接用滑鼠玩：按住圓鈕＝按壓、拖轉盤＝轉馬達、拖色塊或物體到感測器前面、拖主機＝傾斜。零件多的時候會自動分成好幾格。</li>
     <li><b>事件積木</b>：每一個「當…」積木是一條獨立的程式，會同時執行。主機的「左」「右」按鈕可以用滑鼠按住。</li>
     <li><b>對照官方</b>：積木與 Python 的名稱、預設值依 LEGO SPIKE 官方說明。模擬器還沒有的功能（音樂、圖表、天氣…）會在報錯台告訴你。</li>
@@ -202,6 +214,7 @@
 <script src="pyrun.js"></script>
 <script src="app.js"></script>
 <script src="comp.js"></script>
+<script src="lesson.js"></script>
 <script type="module" src="car3d.js"></script>
 </body>
 </html>
