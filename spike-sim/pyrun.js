@@ -2,7 +2,7 @@
 (function (SP) {
   'use strict';
   const VER = '0.26.4';
-  const BASE = (window.SP_PYODIDE_BASE || 'https://cdn.jsdelivr.net/pyodide/v' + VER + '/full/');
+  const BASE = (window.SP_PYODIDE_BASE || 'vendor/pyodide/');
 
   const PRELUDE = `
 import sys, types, asyncio, ast, inspect
@@ -359,7 +359,7 @@ async def _spike_exec(src):
 
   let pyodide = null, loading = null, stopped = false, quiet = false, warned = new Set();
   function loadScript(src) {
-    return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('無法載入 Pyodide（需要網路）：' + src)); document.head.appendChild(s); });
+    return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('無法載入 Python 執行環境（請確認是用網址開啟，而且旁邊的 vendor 資料夾還在）：' + src)); document.head.appendChild(s); });
   }
   async function ensure(onStatus) {
     if (pyodide) return pyodide;

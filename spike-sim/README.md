@@ -5,9 +5,14 @@
 
 ## 怎麼開
 
-直接用 Chrome 開 `spike-sim/index.html` 即可（需要網路，Blockly 與 Python 執行環境從 `cdn.jsdelivr.net` 載入）。
+### 本機（不需要網路）
 
-> **3D 小車預覽需要用網址開啟**（線上的 GitHub Pages 可以）。瀏覽器不允許「雙擊檔案開啟」載入 3D 模組，這時只有 3D 分頁不能用，其他功能都正常。要在本機用 3D，請在 `spike-sim/` 資料夾開一個網頁伺服器，例如 `python3 -m http.server`，再開 `http://localhost:8000/`。
+這個資料夾已經內含所有需要的函式庫（`vendor/`：Blockly、Three.js、Python 執行環境），**完全離線也能跑**。
+
+- **Windows**：雙擊 `啟動模擬器.bat`（黑色視窗不要關，瀏覽器會自動打開）。沒裝 Python 時會改用內建的 PowerShell（沒在實機測過），建議直接 `winget install -e --id Python.Python.3.12`。
+- **Mac／Linux**：終端機執行 `bash 啟動模擬器.command`。
+
+不能直接雙擊 `index.html`：瀏覽器會擋掉 3D 模組和 Python 執行環境（要用網址開）。詳細說明、進度存在哪裡、怎麼把本機改的東西推回 GitHub，看 [本機使用說明.md](本機使用說明.md)。
 
 ### 給學生使用（線上網址）
 
@@ -15,9 +20,7 @@
 
 > `https://boyinslps.github.io/robot-quest/spike-sim/`
 
-根網址 `https://boyinslps.github.io/robot-quest/` 仍然是篩選測驗，兩者互不影響。第一次發佈要等 1～2 分鐘；之後 `spike-sim/` 有更新、合併到 `main` 就會自動更新。
-
-學校網路若擋 `cdn.jsdelivr.net`，積木與 Python 模式都會打不開。
+根網址 `https://boyinslps.github.io/robot-quest/` 仍然是篩選測驗，兩者互不影響。第一次發佈要等 1～2 分鐘；之後 `spike-sim/` 有更新、合併到 `main` 就會自動更新。所有函式庫都放在同一個網站裡（`vendor/`），學校網路擋外部網站也不影響。
 
 ## 功能
 
@@ -97,6 +100,8 @@
 | `comp.js` | 右側「元件模擬」：偵測用到的零件、分割畫面，以及六種零件的滑鼠互動 |
 | `api.js` | 積木與 Python 共用的模擬器 API（馬達、移動、燈光、感測、訊息…） |
 | `car3d.js` | 3D 場地與小車預覽（Three.js，ES 模組，需要用網址開啟） |
+| `vendor/` | 離線用的函式庫（Blockly 11.2.1、Three.js 0.160.0、Pyodide 0.26.4），不要刪 |
+| `啟動模擬器.bat`／`啟動模擬器.command`／`serve.ps1` | 本機啟動檔 |
 | `toolbox.js` | 連續捲動的積木抽屜（自訂 Blockly 工具箱） |
 | `blocks.js` | 積木定義、JavaScript 程式產生器、工具箱、配色與圖示 |
 | `pygen.js` | 積木 → Python 產生器 |

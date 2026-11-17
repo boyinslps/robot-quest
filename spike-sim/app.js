@@ -8,7 +8,7 @@
 
   const ws = Blockly.inject('blockly', {
     toolbox: SP.toolbox, theme: SP.theme, renderer: 'zelos',
-    media: 'https://cdn.jsdelivr.net/npm/blockly@11.2.1/media/',
+    media: 'vendor/blockly/media/',
     zoom: { controls: true, wheel: true, startScale: 0.9, maxScale: 1.6, minScale: 0.5 },
     move: { scrollbars: true, drag: true, wheel: false },
     grid: { spacing: 24, length: 2, colour: '#e3e6ec' },
@@ -199,7 +199,7 @@
     const go = () => { SP.car3d.start($('three-host')); note.textContent = '這是簡化的小車模型（輪子直徑 5.6 公分、兩輪相距 11.2 公分），和真的積木車長得不完全一樣。程式跑起來輪子會跟著轉。'; };
     if (SP.car3d) { go(); return; }
     note.textContent = '正在載入 3D 模組…';
-    const t = setTimeout(() => { if (!SP.car3d) note.textContent = location.protocol === 'file:' ? '3D 預覽需要用網址開啟：瀏覽器不允許「雙擊檔案開啟」載入 3D 模組。請改用線上網址，或在資料夾裡開一個本機網頁伺服器。' : '3D 模組載入失敗（需要網路連到 cdn.jsdelivr.net）。'; }, location.protocol === 'file:' ? 1500 : 12000);
+    const t = setTimeout(() => { if (!SP.car3d) note.textContent = location.protocol === 'file:' ? '3D 預覽需要用網址開啟：瀏覽器不允許「雙擊檔案開啟」載入 3D 模組。請改用線上網址，或雙擊資料夾裡的「啟動模擬器」。' : '3D 模組載入失敗（請確認是用網址開啟，而且旁邊的 vendor 資料夾還在）。'; }, location.protocol === 'file:' ? 1500 : 12000);
     document.addEventListener('car3d-ready', () => { clearTimeout(t); if (view === '3d') go(); }, { once: true });
   }
   $('vt-2d').onclick = () => showView('2d'); $('vt-3d').onclick = () => showView('3d');
@@ -420,7 +420,7 @@
     mode = m;
     document.querySelectorAll('#mode-seg button').forEach((b) => b.classList.toggle('on', b.dataset.mode === m));
     $('pyview').hidden = m !== 'python';
-    if (m === 'python') { if (!pyDirty) regenPython(); updateGutter(); SP.py.ensure((t) => { $('py-status').textContent = t; }).catch(() => { $('py-status').textContent = '尚未載入 Python 執行環境（需要網路）'; }); }
+    if (m === 'python') { if (!pyDirty) regenPython(); updateGutter(); SP.py.ensure((t) => { $('py-status').textContent = t; }).catch(() => { $('py-status').textContent = '尚未載入 Python 執行環境（請確認是用網址開啟，而且旁邊的 vendor 資料夾還在）'; }); }
     else { Blockly.svgResize(ws); if (pyDirty) $('py-note').textContent = ''; }
     autosave();
   }
