@@ -29,7 +29,7 @@ LDraw 不用 LEGO Education 套件號（4560x），而是用零件號。不含�
 - `parts/s/`：子零件
 - `p/`、`p/48/`、`p/8/`：基本圖元（標準、高解析、低解析）
 - `LDConfig.ldr`：顏色定義
-- `_manifest.json`：抓到的檔案清單（共 229 個零件檔＋LDConfig，約 0.66 MB）
+- `manifest.json`：抓到的檔案清單（共 229 個零件檔＋LDConfig，約 0.66 MB）
 
 ## 載入方式
 

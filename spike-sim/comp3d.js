@@ -13,7 +13,7 @@
     T = await import('three');
     OC = (await import('three/addons/controls/OrbitControls.js')).OrbitControls;
     LD = (await import('three/addons/loaders/LDrawLoader.js')).LDrawLoader;
-    const man = await (await fetch('assets/parts/ldraw/_manifest.json')).json();
+    const man = await (await fetch('assets/parts/ldraw/manifest.json')).json();
     const map = {}; for (const [k, v] of Object.entries(man.files)) map[k] = v[0];
     loader = new LD(); loader.smoothNormals = true;
     loader.setPath('assets/parts/ldraw/'); loader.setPartsLibraryPath('assets/parts/ldraw/'); loader.setFileMap(map);
