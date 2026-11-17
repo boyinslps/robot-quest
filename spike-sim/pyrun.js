@@ -2,7 +2,7 @@
 (function (SP) {
   'use strict';
   const VER = '0.26.4';
-  const BASE = (window.SP_PYODIDE_BASE || 'https://cdn.jsdelivr.net/pyodide/v' + VER + '/full/');
+  const BASE = (window.SP_PYODIDE_BASE || 'vendor/pyodide/');
 
   const PRELUDE = `
 import sys, types, asyncio, ast, inspect
@@ -20,15 +20,38 @@ def _pn(p):
     return "ABCDEF"[p]
 
 def _mpn(p):
-    n = _pn(p)
-    if n not in ("A", "B"):
-        raise ValueError("埠 %s 沒有馬達（模擬器：A＝左輪、B＝右輪）" % n)
-    return n
+    return _pn(p)
 
 def _unsupported(what):
     def f(*a, **k):
         raise NotImplementedError("模擬器尚未支援 " + what)
     return f
+
+# 官方 SPIKE 的 awaitable 函式（motor.run_for_degrees、light_matrix.write、sound.beep…）：
+# 不寫 await 也會「立刻開始做」，程式繼續往下；寫了 await 才會等它做完。
+# 這裡包成立刻啟動的 Task：不 await 就在背景跑，await 就等它，程式結束前會等背景動作做完。
+_bg = []
+_beeps = []
+def _aw(f, track=None):
+    def g(*a, **k):
+        t = asyncio.ensure_future(f(*a, **k))
+        fr = sys._getframe(1)
+        _bg.append((t, fr, fr.f_lineno))
+        if track is not None:
+            track.append(t)
+        if t.done() and not t.cancelled() and t.exception() is not None:
+            raise t.exception()
+        return t
+    g.__name__ = f.__name__
+    return g
+
+def _raise_at(e, fr, ln):
+    raise e.with_traceback(types.TracebackType(None, fr, fr.f_lasti, ln))
+
+try:
+    asyncio.get_event_loop().set_task_factory(asyncio.eager_task_factory)
+except Exception:
+    pass
 
 class _Port:
     A, B, C, D, E, F = 0, 1, 2, 3, 4, 5
@@ -62,6 +85,7 @@ class _LightMatrix:
         return top
     def get_orientation(self):
         return _sp.lightOrientGet()
+    @_aw
     async def write(self, text, intensity=100, time_per_character=500):
         _sp.lightText(str(text))
         await _sp.wait(max(1, len(str(text))) * time_per_character / 1000)
@@ -90,11 +114,18 @@ class _Sound:
     ANY = -2; DEFAULT = -1
     WAVEFORM_SINE = 1; WAVEFORM_SAWTOOTH = 3; WAVEFORM_SQUARE = 2; WAVEFORM_TRIANGLE = 1
     async def beep(self, freq=440, duration=500, volume=100, *, attack=0, decay=0, sustain=100, release=0, transition=10, waveform=1, channel=-1):
-        await _sp.beepHz(freq, duration / 1000)
+        try:
+            await _sp.beepHz(freq, duration / 1000)
+        except asyncio.CancelledError:
+            pass
     def stop(self):
         _sp.stopSounds()
+        for t in list(_beeps):
+            t.cancel()
+        _beeps.clear()
     def volume(self, volume):
         pass
+_Sound.beep = _aw(_Sound.beep, _beeps)
 sound = _Sound()
 
 class _Motion:
@@ -163,15 +194,19 @@ class _Motor:
     CLOCKWISE = 0; COUNTERCLOCKWISE = 1; SHORTEST_PATH = 2; LONGEST_PATH = 3
     def run(self, port, velocity, *, acceleration=1000):
         _sp.motorRun(_mpn(port), velocity)
+    @_aw
     async def run_for_degrees(self, port, degrees, velocity, *, stop=1, acceleration=1000, deceleration=1000):
         await _sp.motorDeg(_mpn(port), degrees, velocity)
         return 0
+    @_aw
     async def run_for_time(self, port, duration, velocity, *, stop=1, acceleration=1000, deceleration=1000):
         await _sp.motorTime(_mpn(port), duration, velocity)
         return 0
+    @_aw
     async def run_to_absolute_position(self, port, position, velocity, *, direction=2, stop=1, acceleration=1000, deceleration=1000):
         await _sp.motorGotoAbs(_mpn(port), position, abs(velocity), direction)
         return 0
+    @_aw
     async def run_to_relative_position(self, port, position, velocity, *, stop=1, acceleration=1000, deceleration=1000):
         delta = position - _sp.motorPos(_mpn(port))
         await _sp.motorDeg(_mpn(port), delta, abs(velocity))
@@ -194,31 +229,34 @@ _mod("motor", **{k: getattr(motor, k) for k in dir(motor) if not k.startswith("_
 class _MotorPair:
     PAIR_1 = 0; PAIR_2 = 1; PAIR_3 = 2
     def __init__(self):
-        self._pairs = set()
+        self._pairs = {}
     def pair(self, pair, left_motor, right_motor):
-        if (left_motor, right_motor) != (0, 1):
-            raise ValueError("模擬器目前只支援 motor_pair.pair(..., port.A, port.B)（A＝左輪、B＝右輪）")
-        self._pairs.add(pair)
+        self._pairs[pair] = _pn(left_motor) + "+" + _pn(right_motor)
     def unpair(self, pair):
-        self._pairs.discard(pair)
+        self._pairs.pop(pair, None)
     def _chk(self, pair):
         if pair not in self._pairs:
             raise RuntimeError("請先用 motor_pair.pair(motor_pair.PAIR_1, port.A, port.B) 設定馬達組")
+        _sp.setPair(self._pairs[pair])
     def move(self, pair, steering, *, velocity=360, acceleration=1000):
         self._chk(pair); _sp.mpMove(steering, velocity)
+    @_aw
     async def move_for_degrees(self, pair, degrees, steering, *, velocity=360, stop=1, acceleration=1000, deceleration=1000):
         self._chk(pair); await _sp.mpMoveDeg(abs(degrees), steering, velocity if degrees >= 0 else -velocity)
         return 0
+    @_aw
     async def move_for_time(self, pair, duration, steering, *, velocity=360, stop=1, acceleration=1000, deceleration=1000):
         self._chk(pair); await _sp.mpMoveTime(duration, steering, velocity)
         return 0
     def move_tank(self, pair, left_velocity, right_velocity, *, acceleration=1000):
         self._chk(pair); _sp.mpTank(left_velocity, right_velocity)
+    @_aw
     async def move_tank_for_degrees(self, pair, degrees, left_velocity, right_velocity, *, stop=1, acceleration=1000, deceleration=1000):
         self._chk(pair)
         s = 1 if degrees >= 0 else -1
         await _sp.mpTankDeg(abs(degrees), s * left_velocity, s * right_velocity)
         return 0
+    @_aw
     async def move_tank_for_time(self, pair, left_velocity, right_velocity, duration, *, stop=1, acceleration=1000, deceleration=1000):
         self._chk(pair); await _sp.mpTankTime(duration, left_velocity, right_velocity)
         return 0
@@ -293,8 +331,82 @@ for _n in ("bargraph", "linegraph", "display", "music", "sound"):
 import time as _time
 _time.ticks_ms = _sp.ticksMs
 def _blocked_sleep(*a):
-    raise NotImplementedError("請改用 await runloop.sleep_ms(毫秒)（time.sleep_ms 會讓整個程式停住，模擬器不支援）")
+    raise NotImplementedError("這個位置的 time.sleep_ms 模擬器處理不了（例如放在 lambda 裡）。請改寫成一般的敘述，或在 async 函式裡用 await runloop.sleep_ms(毫秒)")
 _time.sleep_ms = _blocked_sleep
+
+# 官方 time.sleep_ms(x)：暫停整個程式 x 毫秒。瀏覽器不能真的卡住，所以執行前把
+# 「time.sleep_ms(x)」這種單獨一行的敘述改成 await（最外層與 async 函式裡直接改；
+# 一般 def 函式裡有用到的，整個函式連同呼叫它的地方一起改成 async／await）。
+async def _spike_sleep(ms):
+    await _sp.wait(ms / 1000)
+
+def _is_sleep(call):
+    f = call.func
+    return (isinstance(f, ast.Attribute) and f.attr == "sleep_ms" and isinstance(f.value, ast.Name) and f.value.id == "time") or (isinstance(f, ast.Name) and f.id == "sleep_ms")
+
+def _has_sleep_stmt(fn):
+    for n in ast.walk(fn):
+        if isinstance(n, ast.Expr) and isinstance(n.value, ast.Call) and _is_sleep(n.value):
+            return True
+    return False
+
+def _need_async(tree):
+    fns = [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]
+    need = set(f.name for f in fns if _has_sleep_stmt(f))
+    changed = True
+    while changed:
+        changed = False
+        for f in fns:
+            if f.name in need:
+                continue
+            for n in ast.walk(f):
+                if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id in need:
+                    need.add(f.name); changed = True; break
+    return need
+
+class _AsyncSleep(ast.NodeTransformer):
+    def __init__(self, need):
+        self.need = need
+        self.ctx = [True]
+    def visit_FunctionDef(self, node):
+        if node.name in self.need:
+            new = ast.AsyncFunctionDef(name=node.name, args=node.args, body=node.body, decorator_list=node.decorator_list,
+                                       returns=node.returns, type_comment=None, type_params=getattr(node, "type_params", []))
+            ast.copy_location(new, node)
+            self.ctx.append(True); self.generic_visit(new); self.ctx.pop()
+            return new
+        self.ctx.append(False); self.generic_visit(node); self.ctx.pop()
+        return node
+    def visit_AsyncFunctionDef(self, node):
+        self.ctx.append(True); self.generic_visit(node); self.ctx.pop()
+        return node
+    def visit_Lambda(self, node):
+        return node
+    def visit_Expr(self, node):
+        v = node.value
+        if self.ctx[-1] and isinstance(v, ast.Call) and _is_sleep(v):
+            call = ast.Call(ast.Name("__spike_sleep__", ast.Load()), v.args, [])
+            aw = ast.Await(call)
+            new = ast.Expr(aw)
+            for x in (call, call.func, aw, new):
+                ast.copy_location(x, node)
+            return new
+        self.generic_visit(node)
+        return node
+    def visit_Await(self, node):
+        v = node.value
+        if isinstance(v, ast.Call) and isinstance(v.func, ast.Name) and v.func.id in self.need:
+            v.args = [self.visit(a) for a in v.args]
+            return node
+        self.generic_visit(node)
+        return node
+    def visit_Call(self, node):
+        self.generic_visit(node)
+        if self.ctx[-1] and isinstance(node.func, ast.Name) and node.func.id in self.need:
+            aw = ast.Await(node)
+            ast.copy_location(aw, node)
+            return aw
+        return node
 
 # 真正的主機有獨立的執行緒，while True 裡不寫 await 也可以；瀏覽器不行。
 # 所以執行前在每個（位於 async def 或最外層的）迴圈開頭自動插入 await，讓模擬器前進一步。
@@ -325,19 +437,36 @@ class _AddTick(ast.NodeTransformer):
 def _spike_reset():
     motor_pair._pairs.clear()
     _q.clear()
+    _bg.clear()
+    _beeps.clear()
 
 def _spike_check(src):
     ast.parse(src, "<exec>")
 
 async def _spike_exec(src):
     tree = ast.parse(src, "<exec>")
+    need = _need_async(tree)
+    tree = _AsyncSleep(need).visit(tree)
+    ast.fix_missing_locations(tree)
     tree = _AddTick().visit(tree)
     ast.fix_missing_locations(tree)
     code = compile(tree, "<exec>", "exec", flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT)
-    g = {"__name__": "__main__", "__spike_tick__": _spike_tick}
+    g = {"__name__": "__main__", "__spike_tick__": _spike_tick, "__spike_sleep__": _spike_sleep}
     r = eval(code, g)
     if inspect.iscoroutine(r):
         await r
+    # 程式最後一行跑完了：官方主機會讓馬達、燈陣文字等已經下達的動作做完，這裡也等它們做完
+    while True:
+        pend = [x[0] for x in _bg if not x[0].done()]
+        if not pend:
+            break
+        await asyncio.gather(*pend, return_exceptions=True)
+    for t, fr, ln in _bg:
+        if t.cancelled():
+            continue
+        e = t.exception()
+        if e is not None and not isinstance(e, SystemExit):
+            _raise_at(e, fr, ln)
 `;
 
   const ZH = [
@@ -363,7 +492,7 @@ async def _spike_exec(src):
 
   let pyodide = null, loading = null, stopped = false, quiet = false, warned = new Set();
   function loadScript(src) {
-    return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('無法載入 Pyodide（需要網路）：' + src)); document.head.appendChild(s); });
+    return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('無法載入 Python 執行環境（請確認是用網址開啟，而且旁邊的 vendor 資料夾還在）：' + src)); document.head.appendChild(s); });
   }
   async function ensure(onStatus) {
     if (pyodide) return pyodide;
@@ -391,6 +520,7 @@ async def _spike_exec(src):
       mpTankDeg: (d, l, r) => api.tankDegrees(d, pct(l), pct(r)),
       mpTankTime: async (ms, l, r) => { api.tank(pct(l), pct(r)); await api.wait(Number(ms) / 1000); api.stop(); },
       mpMoveDeg: (d, st, v) => api.moveDegrees(d, st, pct(v)), mpMoveTime: (ms, st, v) => api.moveTime(ms, st, pct(v)),
+      setPair: (s) => api.setPair(s),
       motorRun: (p, v) => api.motorStart(p, pct(v)),
       motorDeg: (p, d, v) => api.motorTurnAt(p, Number(d) * (v < 0 ? -1 : 1), Math.abs(pct(v))),
       motorTime: async (p, ms, v) => { api.motorStart(p, pct(v)); await api.wait(Number(ms) / 1000); api.motorStop(p); },

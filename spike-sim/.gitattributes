@@ -1,0 +1,6 @@
+# 啟動檔的換行：Windows 的 .bat／.ps1 一定要 CRLF，Mac／Linux 的 .command 一定要 LF（不然會跑不起來）
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+*.command text eol=lf
+*.wasm binary
+*.zip binary

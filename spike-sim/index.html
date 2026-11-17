@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SPIKE 模擬器</title>
 <link rel="stylesheet" href="style.css">
-<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
-<script src="https://cdn.jsdelivr.net/npm/blockly@11.2.1/blockly_compressed.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/blockly@11.2.1/blocks_compressed.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/blockly@11.2.1/javascript_compressed.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/blockly@11.2.1/python_compressed.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/blockly@11.2.1/msg/zh-hant.js"></script>
+<script type="importmap">{ "imports": { "three": "./vendor/three/three.module.js", "three/addons/": "./vendor/three/addons/" } }</script>
+<script src="vendor/blockly/blockly_compressed.js"></script>
+<script src="vendor/blockly/blocks_compressed.js"></script>
+<script src="vendor/blockly/javascript_compressed.js"></script>
+<script src="vendor/blockly/python_compressed.js"></script>
+<script src="vendor/blockly/msg/zh-hant.js"></script>
 </head>
 <body>
 <div id="home">
@@ -77,6 +77,7 @@
       <nav class="viewtabs" id="viewtabs" aria-label="模擬畫面">
         <button type="button" data-view="field" class="on">場地模擬</button>
         <button type="button" data-view="comp">元件模擬<span class="badge" id="comp-badge" hidden>0</span></button>
+        <button type="button" class="cleardata" id="btn-cleardata" title="把馬達圈數、偏航角、計時器、燈、軌跡和輸出訊息全部歸零（不會動到車子的位置和你的程式）">清除數據</button>
       </nav>
       <div id="tab-field">
       <div class="card stage-card" id="stage-card">
@@ -190,16 +191,17 @@
   <h2>使用說明</h2>
   <ul>
     <li><b>寫程式</b>：從左邊的類別拖積木到中間，接在「當程式開始」下面，按右下角綠色 ▶ 執行。</li>
-    <li><b>機器人</b>：馬達 A 是左輪、馬達 B 是右輪（輪徑 5.6 公分、輪距 11.2 公分）。可以拖曳機器人、旋轉按鈕調整方向，「重設位置」回到起點。</li>
-    <li><b>裝置</b>：C～F 埠可以選顏色、距離或力感測器。積木上的埠要和這裡的設定一致，否則會出現錯誤訊息。預設 C＝顏色、D＝距離、E＝力。</li>
+    <li><b>機器人</b>：預設馬達 A 是左輪、馬達 B 是右輪（輪徑 5.6 公分、輪距 11.2 公分）。可以拖曳機器人、旋轉按鈕調整方向，「重設位置」回到起點。</li>
+    <li><b>裝置</b>：A～F 六個接口都可以接馬達、顏色、距離或力感測器（或空著）。積木上的埠要和接的零件一致，否則會出現錯誤訊息。可以在「主機與裝置」選，也可以在「元件模擬」最上面一排用滑鼠把零件拖來拖去。預設 A、B＝馬達，C＝顏色、D＝距離、E＝力。</li>
     <li><b>布置場地</b>：按「布置場地」可以拖曳畫出方塊（機器人推得動）、牆、色紙、黑線膠帶，用「橡皮擦」刪除；「設為起點」會把機器人現在的位置當起點。「全螢幕」可以放大場地，上課投影很方便。「3D 車子」可以旋轉、縮放小車，程式跑起來輪子會跟著轉。</li>
     <li><b>感測器位置</b>：顏色感測器在機器人前方底部，距離感測器在最前方中央，力感測器是前方的碰撞探針。</li>
     <li><b>轉向角度</b>：順時針為正，範圍 −180～179。程式一開始會自動歸零。</li>
     <li><b>學習任務</b>：首頁的「學習任務」會一步一步帶你拖積木。看右上角的「目前任務」，橘色框和小手會指出要拿哪一塊、放在哪裡；做對了會自動換下一步。</li>
+    <li><b>清除數據</b>：右邊「元件模擬」旁邊的按鈕，會把馬達的圈數、偏航角、計時器、燈、行駛軌跡和輸出訊息全部歸零，不會動到車子的位置和你的程式。（LEGO 沒有一次清全部的積木，要用「重設計時器」「將偏航角設為 0」「將相對位置設為 0」分開重設。）</li>
     <li><b>場地模擬／元件模擬</b>：右邊上方可以切換。「場地模擬」看車子在場地上跑；「元件模擬」會把你積木用到的零件（馬達、感測器、母體燈、陀螺儀）放出來，直接用滑鼠玩：按住圓鈕＝按壓、拖轉盤＝轉馬達、拖色塊或物體到感測器前面、拖主機＝傾斜。零件多的時候會自動分成好幾格。</li>
     <li><b>事件積木</b>：每一個「當…」積木是一條獨立的程式，會同時執行。主機的「左」「右」按鈕可以用滑鼠按住。</li>
     <li><b>對照官方</b>：積木與 Python 的名稱、預設值依 LEGO SPIKE 官方說明。模擬器還沒有的功能（音樂、圖表、天氣…）會在報錯台告訴你。</li>
-    <li><b>Python</b>：上方切到「Python」會把積木轉成 SPIKE App 3 風格的 Python，也可以直接改。Python 改過之後不會變回積木。避免寫沒有 <code>await</code> 的無窮迴圈（會讓網頁卡住）。</li>
+    <li><b>Python</b>：上方切到「Python」會把積木轉成 SPIKE App 3 風格的 Python，也可以直接改。Python 改過之後不會變回積木。LEGO 官方入門頁的寫法可以直接貼：由上往下執行、<code>time.sleep_ms()</code>、<code>motor.run_for_degrees(...)</code> 不加 <code>await</code> 都行（模擬器會自動處理）。</li>
     <li><b>報錯台</b>：執行前會先檢查積木（缺條件、埠不符、沒接事件積木），執行時的錯誤會列在這裡，點一下可跳到那個積木或程式行。</li>
     <li><b>儲存／開啟</b>：存成 .json 檔，也會自動保存在這台電腦的瀏覽器裡。</li>
   </ul>

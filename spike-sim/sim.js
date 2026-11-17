@@ -113,14 +113,15 @@
       this.bg = document.createElement('canvas'); this.bg.width = W * PX; this.bg.height = H * PX;
       this.bgCtx = this.bg.getContext('2d', { willReadFrequently: true });
       this.trail = document.createElement('canvas'); this.trail.width = W * PX; this.trail.height = H * PX;
-      this.mL = { dps: 0, deg: 0 }; this.mR = { dps: 0, deg: 0 };
+      this.mot = {}; for (const p of 'ABCDEF') this.mot[p] = { dps: 0, deg: 0, cur: 0 };       // 六個埠各一顆馬達（有沒有接上看 ports）
+      this.pairL = 'A'; this.pairR = 'B';                                                     // 「移動馬達組」：左輪、右輪接在哪個埠
       this.simTime = 0; this.timerOff = 0; this.yawOff = 0; this.lastMoveT = 0;
       this.waiters = []; this.pending = 0; this.aborted = false; this.acc = 0; this.mul = 1; this.pumping = false;
       this.penOn = true; this.showSensors = true; this.display = ''; this.onDisplay = null;
       this.speedPct = 50; this.msgs = {};
       this.wheelD = WHEEL_D; this.track = TRACK; this.real = false; this.yawSign = 1; this.scaleL = 1; this.scaleR = 1;
-      this.ports = { C: 'color', D: 'distance', E: 'force', F: 'none' };
-      this.motorSpeed = { A: 75, B: 75 };   // 官方預設：馬達 75 %、移動 50 %
+      this.ports = { A: 'motor', B: 'motor', C: 'color', D: 'distance', E: 'force', F: 'none' };   // 每個埠可接：motor／color／distance／force／none
+      this.motorSpeed = { A: 75, B: 75, C: 75, D: 75, E: 75, F: 75 };   // 官方預設：馬達 75 %、移動 50 %
       this.cmPerRot = 17.5;                 // 官方預設：1 圈馬達旋轉 = 17.5 公分（可用「設定 1 圈…」校正）
       this.buttons = { left: 0, right: 0 };  // 主機左右按鈕，按下的毫秒數
       this.powerColor = -1; this.matrixRot = 0; this.matrixBright = 100;
@@ -157,7 +158,7 @@
       const s = this.start;
       this.rects.forEach((r) => { if (r.ox !== undefined) { r.x = r.ox; r.y = r.oy; } });
       this.x = s.x; this.y = s.y; this.th = rad(s.a); this.nudgeFree();
-      this.mL.dps = this.mR.dps = 0; this.mL.cur = this.mR.cur = 0;
+      for (const m of Object.values(this.mot)) { m.dps = 0; m.cur = 0; }
       this.rollError();
       this.yawOff = this.th; this.lastMoveT = this.simTime;
     }
@@ -224,7 +225,9 @@
 
     /* --- 驅動 --- */
     drive(l, r) { this.mL.dps = l * 10; this.mR.dps = r * 10; }
-    stopAll() { this.mL.dps = 0; this.mR.dps = 0; }
+    stopAll() { for (const m of Object.values(this.mot)) m.dps = 0; }
+    get mL() { return this.mot[this.pairL]; }
+    get mR() { return this.mot[this.pairR]; }
     rectHits(x, y, th) {
       const fixed0 = obbOutside(x, y, th, HW, HL);
       let fixed = fixed0; const push = new Set();
@@ -287,9 +290,12 @@
     }
     step() {
       const a = this.real ? 3000 * DT : Infinity;  // 真實模式：馬達加減速 3000 度/秒²
-      for (const m of [this.mL, this.mR]) m.cur = (m.cur || 0) + Math.max(-a, Math.min(a, m.dps - (m.cur || 0)));
+      for (const p of 'ABCDEF') {
+        const m = this.mot[p];
+        if (this.ports[p] !== 'motor') { m.dps = 0; m.cur = 0; continue; }        // 沒接馬達就不會轉
+        m.cur = (m.cur || 0) + Math.max(-a, Math.min(a, m.dps - (m.cur || 0))); m.deg += m.cur * DT;
+      }
       const dl = this.mL.cur * DT, dr = this.mR.cur * DT;
-      this.mL.deg += dl; this.mR.deg += dr;
       const k = Math.PI * this.wheelD / 360, sl = dl * k * this.scaleL, sr = dr * k * this.scaleR;
       const ds = (sl + sr) / 2, dth = (sl - sr) / this.track, mid = this.th + dth / 2;
       let nx = this.x + ds * Math.sin(mid), ny = this.y - ds * Math.cos(mid), nth = this.th + dth;
