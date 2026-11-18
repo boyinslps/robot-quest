@@ -29,7 +29,7 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); 
 .round:hover { filter: brightness(1.07); }
 .round:active { transform: scale(.96); }
 
-.side { width: 500px; flex: none; padding: 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; border-left: 1px solid var(--line); background: var(--bg); }
+.side { width: 500px; flex: none; transition: width .18s; padding: 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; border-left: 1px solid var(--line); background: var(--bg); }
 .card { background: var(--card); border-radius: 12px; border: 1px solid var(--line); padding: 10px 12px; }
 .card-h { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
 .card-t { font-weight: 800; font-size: 15px; margin-right: auto; }
@@ -208,21 +208,9 @@ dialog li { margin: 6px 0; line-height: 1.55; }
 .viewtabs button.on { background: #fff; color: #1c4fb5; box-shadow: 0 1px 4px rgba(20,30,60,.18); }
 .viewtabs .badge { min-width: 22px; height: 22px; border-radius: 11px; background: #ffd400; color: #262a33; font: 900 13px var(--font); display: grid; place-items: center; padding: 0 6px; }
 .viewtabs .badge[hidden] { display: none; }
-#tab-comp { flex: 1 1 auto; min-height: min(720px, calc(100vh - 140px)); display: flex; flex-direction: column; }
-.comp-grid { flex: 1; display: grid; gap: 10px; grid-auto-rows: minmax(0, 1fr); min-height: 0; grid-template-columns: 1fr; }
-.comp-grid.n3, .comp-grid.n4, .comp-grid.n5, .comp-grid.n6, .comp-grid.n7, .comp-grid.n8 { grid-template-columns: 1fr 1fr; }
 .comp-empty { flex: 1; display: grid; place-items: center; text-align: center; color: var(--muted); font-weight: 700; line-height: 1.8; padding: 30px; background: #fff; border: 2px dashed var(--line); border-radius: 16px; }
 .comp-empty b { display: block; font-size: 17px; color: #3d4357; margin-bottom: 6px; }
-.part { background: #fff; border: 1px solid var(--line); border-radius: 16px; display: flex; flex-direction: column; overflow: hidden; min-height: 0; min-width: 0; }
 .part.warn { border-color: #e5483d; box-shadow: 0 0 0 2px #ffd9d6; }
-.part-h { display: flex; align-items: center; gap: 8px; padding: 9px 12px 0; font-weight: 900; font-size: 14px; flex: none; }
-.part-h .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; }
-.part-h .ptag { margin-left: auto; background: #262a33; color: #fff; border-radius: 8px; padding: 1px 9px; font-size: 12px; }
-.part-b { flex: 1; min-height: 0; display: grid; place-items: center; padding: 2px 8px; position: relative; }
-.part-b > svg { width: 100%; height: 100%; touch-action: none; user-select: none; -webkit-user-select: none; display: block; }
-.part-f { padding: 0 12px 4px; font-size: 12px; color: var(--muted); font-weight: 700; display: flex; justify-content: space-between; gap: 4px 10px; flex-wrap: wrap; flex: none; }
-.part-f b { color: #1c4fb5; font-variant-numeric: tabular-nums; }
-.part-hint { padding: 0 12px 9px; font-size: 12px; color: #8a91a6; flex: none; }
 .part .grab { cursor: grab; } .part .grabbing { cursor: grabbing; }
 .part .press { cursor: pointer; }
 .gyro-wrap { position: absolute; left: 50%; top: 50%; width: 260px; height: 260px; margin: -130px 0 0 -130px; transform-origin: 50% 50%; perspective: 640px; touch-action: none; user-select: none; }
@@ -232,7 +220,6 @@ dialog li { margin: 6px 0; line-height: 1.55; }
 .gyro-wrap .face svg { width: 80%; }
 .gyro-wrap .ringsvg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .gyro-wrap .ringsvg .hit { pointer-events: stroke; cursor: grab; }
-.comp-grid.n5, .comp-grid.n6, .comp-grid.n7, .comp-grid.n8 { flex: none; grid-auto-rows: 270px; }
 
 /* ---------- 學習任務：右側「目前任務」卡片 ---------- */
 .home-note { color: var(--muted); margin: -4px 0 10px; font-size: 13px; }
@@ -263,7 +250,6 @@ dialog li { margin: 6px 0; line-height: 1.55; }
 .lc-dots i { width: 9px; height: 9px; border-radius: 50%; background: #dfe3ec; }
 .lc-dots i.done { background: #2fb85f; }
 .lc-dots i.cur { background: #ffd400; box-shadow: 0 0 0 3px #fff2a8; }
-body.has-lesson #tab-comp { min-height: min(640px, calc(100vh - 330px)); }
 
 /* ---------- 引導：手勢拖曳動畫、虛線積木、光圈 ---------- */
 #lguide { position: fixed; inset: 0; pointer-events: none; z-index: 900; }
@@ -330,13 +316,9 @@ body.has-lesson #tab-comp { min-height: min(640px, calc(100vh - 330px)); }
 .hubtop .hub-btn { height: auto; border-width: 3px; }
 
 /* ===== 元件模擬 3D ===== */
-.p3d-host{position:relative;width:100%;aspect-ratio:4/3;background:linear-gradient(#f4f7fb,#e3e9f2);border-radius:10px;overflow:hidden;touch-action:none}
 .p3d{display:block;width:100%;height:100%;cursor:grab}
 .p3d:active{cursor:grabbing}
 .p3d-loading{position:absolute;inset:0;display:grid;place-items:center;color:#64748b;font-weight:700;font-size:.9rem}
-.p3d-bar{display:flex;gap:6px;justify-content:center;margin:6px 0 2px}
-.p3d-bar button{font:inherit;font-size:.78rem;padding:2px 10px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#334155;cursor:pointer}
-.p3d-bar button:hover{background:#f1f5f9}
 
 .hubtop.noimg { background: #f3f5f9; border: 2px solid #c9cfdb; border-radius: 14px; }
 
@@ -346,3 +328,63 @@ body.has-lesson #tab-comp { min-height: min(640px, calc(100vh - 330px)); }
 .hubtop .hbtn { top: 78.5%; width: 17%; height: 7%; }
 .hubtop .hbtn.hl { left: 19.5%; } .hubtop .hbtn.hr { left: 63.5%; }
 .hubtop .hub-btn { left: 50%; top: 81.9%; width: 24%; }
+
+
+/* ===== 模擬視窗版面（UI規範_模擬視窗 v1） ===== */
+/* 側欄寬度與分隔線 */
+.side.dragging { transition: none; }
+.splitter { width: 8px; flex: none; cursor: col-resize; background: transparent; position: relative; margin: 0 -4px; z-index: 5; touch-action: none; }
+.splitter::after { content: ''; position: absolute; left: 3px; top: 0; bottom: 0; width: 2px; background: var(--line); transition: background .12s; }
+.splitter:hover::after, .splitter.on::after { background: #5b8def; width: 4px; left: 2px; }
+.viewtabs { grid-template-columns: 1fr 1fr 1fr auto auto; }
+.viewtabs button { padding: 10px 6px; font-size: 15px; white-space: nowrap; }
+.viewtabs .widen { background: #fff; color: #1c4fb5; border: 2px solid #c9d6f2; font-size: 13px; padding: 6px 10px; }
+.viewtabs .widen:hover { background: #eef3ff; }
+.viewtabs .widen[aria-pressed="true"] { background: #1c4fb5; color: #fff; border-color: #1c4fb5; }
+@media (max-width: 1099px) { .splitter, .viewtabs .widen { display: none; } .viewtabs { grid-template-columns: 1fr 1fr 1fr auto; } }
+.sig-corner { position: fixed; right: 6px; bottom: 3px; font: 600 11px var(--font); color: #9aa3b8; pointer-events: none; z-index: 50; }
+
+/* 元件模擬 */
+#tab-comp { flex: none; display: flex; flex-direction: column; gap: 10px; }
+#tab-comp[hidden] { display: none; }
+.comp-portline { height: 32px; flex: none; display: flex; align-items: center; gap: 14px; padding: 0 4px 0 2px; font: 700 14px var(--font); color: #3d4357; overflow: hidden; white-space: nowrap; }
+.comp-portline .pl-list { flex: 1; min-width: 0; display: flex; align-items: center; gap: 16px; overflow: hidden; }
+.comp-portline .pl-item { display: inline-flex; align-items: center; gap: 6px; }
+.comp-portline .pl-item i { width: 10px; height: 10px; border-radius: 50%; background: #0090f5; flex: none; }
+.comp-portline .pl-item.bad { color: #d92d20; }
+.comp-portline .pl-none { color: var(--muted); font-weight: 600; }
+.comp-portline .pl-go { flex: none; border: 1px solid #c9d6f2; background: #fff; color: #1c4fb5; border-radius: 999px; padding: 4px 12px; font: 800 13px var(--font); cursor: pointer; }
+.comp-portline .pl-go:hover { background: #eef3ff; }
+.comp-grid { --cols: 1; display: grid; gap: 12px; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); align-items: start; }
+.comp-grid[hidden] { display: none; }
+.part { position: relative; background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 8px; display: flex; flex-direction: column; min-width: 0; }
+.part-h { display: flex; align-items: center; gap: 8px; height: 36px; flex: none; font-weight: 900; font-size: 14px; }
+.part-h .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+.part-h .ptag { background: #262a33; color: #fff; border-radius: 8px; padding: 1px 9px; font-size: 12px; flex: none; }
+.part-tools { margin-left: auto; display: flex; align-items: center; gap: 4px; flex: none; }
+.part-tools button, .p3d-bar button { font: 800 12px var(--font); min-width: 30px; height: 28px; padding: 0 9px; border-radius: 999px; border: 1px solid #cbd5e1; background: #fff; color: #334155; cursor: pointer; }
+.part-tools button:hover, .p3d-bar button:hover { background: #eef3ff; border-color: #9db4ea; }
+.p3d-bar { display: contents; }
+.part-q { width: 28px; padding: 0 !important; border-radius: 50% !important; }
+.part-b { position: relative; min-height: 300px; display: grid; place-items: center; }
+.part-b > svg { width: 100%; height: auto; max-height: 460px; touch-action: none; user-select: none; -webkit-user-select: none; display: block; }
+.part-f { padding: 6px 4px 0; font-size: 13px; color: var(--muted); font-weight: 700; display: flex; gap: 14px; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; flex: none; }
+.part-f > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.part-f b { color: #1c4fb5; font-variant-numeric: tabular-nums; }
+.part-hint { display: none; position: absolute; left: 8px; right: 8px; top: 46px; z-index: 8; background: rgba(38,42,51,.92); color: #fff; font: 600 13px/1.5 var(--font); padding: 8px 12px; border-radius: 10px; pointer-events: none; }
+.part-hint.show { display: block; }
+.p3d-host { position: relative; width: 100%; aspect-ratio: 4 / 3; min-height: 300px; background: linear-gradient(#f4f7fb, #e3e9f2); border-radius: 10px; overflow: hidden; touch-action: none; }
+.comp-grid.n1 .p3d-host { aspect-ratio: auto; height: max(300px, min(calc((var(--gw, 600px) - 18px) * .75), calc(100vh - 260px))); }
+/* 單一零件全螢幕 */
+.part-full { position: fixed; inset: 0; z-index: 1500; background: rgba(15,23,42,.55); display: grid; place-items: center; }
+.part-full > .part { width: 92vw; height: 88vh; }
+.part-full > .part .part-b { flex: 1; min-height: 0; }
+.part-full > .part .p3d-host, .comp-grid.n1 .part-full .p3d-host { aspect-ratio: auto; width: 100%; height: 100%; max-height: none; }
+.part-full > .part .part-b > svg { max-height: 100%; height: 100%; }
+/* 接口連接 */
+.wire-wrap { display: flex; flex-direction: column; }
+.wire-wrap .wire-hint { order: -1; font-size: 13px; margin: 0 4px 8px; }
+.wire-svg { width: 100%; height: auto; max-height: calc(100vh - 230px); }
+.part { container-type: inline-size; }
+.p3d-bar button.opt { display: none; }
+@container (min-width: 470px) { .p3d-bar button.opt { display: inline-block; } }

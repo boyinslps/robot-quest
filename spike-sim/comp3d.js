@@ -59,7 +59,7 @@
     cv.addEventListener('pointermove', (e) => { if (v.drag) { e.stopImmediatePropagation(); if (v.hooks.move) v.hooks.move(e); } else if (v.hooks.hover) v.hooks.hover(e); }, true);
     const end = (e) => { if (!v.drag) return; v.drag = false; e.stopImmediatePropagation(); try { cv.releasePointerCapture(e.pointerId); } catch (x) { /* 略 */ } if (v.hooks.up) v.hooks.up(e); };
     cv.addEventListener('pointerup', end, true); cv.addEventListener('pointercancel', end, true);
-    const controls = new OC(cam, cv); controls.enableDamping = true; controls.target.set(...(opts.target || [0, 0, 0])); controls.minDistance = 40; controls.maxDistance = 600; controls.update();
+    const controls = new OC(cam, cv); controls.enableDamping = true; controls.target.set(...(opts.target || [0, 0, 0])); cam.position.sub(controls.target).multiplyScalar(1.2).add(controls.target); controls.minDistance = 40; controls.maxDistance = 600; controls.update();
     v.controls = controls;
     const resize = () => { const w = host.clientWidth || 300, h = host.clientHeight || 225; R.setSize(w, h, false); cv.style.width = '100%'; cv.style.height = '100%'; cam.aspect = w / h; cam.updateProjectionMatrix(); };
     const ro = new ResizeObserver(resize); ro.observe(host); resize();
@@ -71,8 +71,9 @@
     v.setView = (name) => { const t = controls.target, d = cam.position.distanceTo(t), dirs = { iso: [0.7, 0.55, 0.8], top: [0, 1, 0.001], front: [0, 0.15, 1], side: [1, 0.15, 0] }[name]; if (!dirs) return; const n = new T.Vector3(...dirs).normalize().multiplyScalar(d); cam.position.copy(t).add(n); controls.update(); };
     // 視角小按鈕
     const bar = H('div', { class: 'p3d-bar' });
-    [['iso', '立體'], ['top', '上視'], ['front', '正視'], ['side', '側視']].forEach(([k, t]) => { const b = H('button', { type: 'button', text: t }); b.onclick = () => v.setView(k); bar.append(b); });
-    f.body.append(bar);
+    [['iso', '立體'], ['top', '上視'], ['front', '正視'], ['side', '側視']].forEach(([k, t], i) => { const b = H('button', { type: 'button', text: t, class: i > 1 ? 'opt' : '' }); b.onclick = () => v.setView(k); bar.append(b); });
+    // 視角按鈕放進標題列右側（不再另佔 3D 下方一列）
+    if (f.tools) f.tools.prepend(bar); else f.body.append(bar);
     return v;
   }
   const mat = (c, o = {}) => new T.MeshStandardMaterial(Object.assign({ color: c, roughness: 0.55, metalness: 0.02 }, o));
@@ -275,7 +276,7 @@
   /* ---------- 力感測器：按住黑色按鈕，越久越用力 ---------- */
   function forcePane(port) {
     const f = frame('力傳感器', '#34ccf1', port, '用滑鼠按住感測器上方的黑色按鈕，按得越久越用力；放開就鬆開。拖空白處＝轉視角。');
-    const v = makeView(f, { cam: [80, 100, 100], target: [0, 8, 0] }); if (!v) return null;
+    const v = makeView(f, { cam: [55, 70, 70], target: [0, 6, 0] }); if (!v) return null;
     f.chip('n', '力'); f.chip('s', '狀態');
     let model = null, arrow = null;
     loadModel('37312.dat').then((m) => { model = m; v.scene.add(m); v.ready(); });

@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="author" content="資訊老師黃博胤">
 <title>SPIKE 模擬器</title>
 <link rel="stylesheet" href="style.css">
 <script type="importmap">{ "imports": { "three": "./vendor/three/three.module.js", "three/addons/": "./vendor/three/addons/" } }</script>
@@ -66,6 +67,8 @@
       </div>
     </section>
 
+    <div class="splitter" id="splitter" role="separator" aria-orientation="vertical" title="拖曳調整右側寬度"></div>
+
     <aside class="side">
       <section class="lesson-card" id="lesson-card" hidden aria-live="polite">
         <div class="lc-head"><span class="lc-ic cat-icon" id="lc-ic"></span><span class="lc-title" id="lc-title"></span><button class="lc-exit" id="lc-exit" type="button" title="離開這個任務">離開</button></div>
@@ -78,6 +81,7 @@
         <button type="button" data-view="field" class="on">場地模擬</button>
         <button type="button" data-view="comp">元件模擬<span class="badge" id="comp-badge" hidden>0</span></button>
         <button type="button" data-view="wire">接口連接</button>
+        <button type="button" class="widen" id="btn-widen" aria-pressed="false" title="把右側放到最大（積木區縮到最小）">⤢ 放大</button>
         <button type="button" class="cleardata" id="btn-cleardata" title="把馬達圈數、偏航角、計時器、燈、軌跡和輸出訊息全部歸零（不會動到車子的位置和你的程式）">清除數據</button>
       </nav>
       <div id="tab-field">
@@ -226,5 +230,6 @@
 <script src="comp3d.js"></script>
 <script src="lesson.js"></script>
 <script type="module" src="car3d.js"></script>
+<div class="sig-corner">made by 資訊老師黃博胤</div>
 </body>
 </html>

@@ -70,11 +70,40 @@
   /* ---------- 零件外框 ---------- */
   function frame(title, dotColor, port, hint) {
     const body = H('div', { class: 'part-b' }), foot = H('div', { class: 'part-f' });
-    const root = H('section', { class: 'part' }, H('div', { class: 'part-h' }, H('span', { class: 'dot', style: 'background:' + dotColor }), title, port ? H('span', { class: 'ptag', text: port }) : null), body, foot, H('div', { class: 'part-hint', text: hint }));
+    const tools = H('div', { class: 'part-tools' });
+    const hintEl = H('div', { class: 'part-hint', text: hint || '' });
+    const root = H('section', { class: 'part' }, H('div', { class: 'part-h' }, H('span', { class: 'dot', style: 'background:' + dotColor }), title, port ? H('span', { class: 'ptag', text: port }) : null, tools), body, foot, hintEl);
+    // 「?」說明：滑鼠移上去或點一下才顯示；「⤢」單一零件全螢幕
+    if (hint) {
+      const q = H('button', { type: 'button', class: 'part-q', text: '?', title: hint, 'aria-label': '操作說明' });
+      q.onmouseenter = () => hintEl.classList.add('show'); q.onmouseleave = () => { if (!q.dataset.on) hintEl.classList.remove('show'); };
+      q.onclick = () => { if (q.dataset.on) { delete q.dataset.on; hintEl.classList.remove('show'); } else { q.dataset.on = '1'; hintEl.classList.add('show'); } };
+      tools.append(q);
+    }
+    const fb = H('button', { type: 'button', class: 'part-fs', text: '⤢', title: '全螢幕', 'aria-label': '全螢幕' });
+    fb.onclick = () => (SP.partFull && SP.partFull.root === root ? exitFull() : enterFull(root, fb));
+    tools.append(fb);
     const chips = {};
     const chip = (name, label) => { const b = H('b', { text: '—' }); foot.append(H('span', {}, label + ' ', b)); chips[name] = (v) => { if (b.textContent !== String(v)) b.textContent = v; }; };
-    return { root, body, foot, chip, chips, note: null };
+    return { root, body, foot, chip, chips, note: null, tools };
   }
+  /* ---------- 單一零件全螢幕：把同一個 DOM 節點搬進覆蓋層，關掉再搬回原位（不重建，WebGL 不會重開） ---------- */
+  function enterFull(root, btn) {
+    exitFull();
+    const ph = document.createComment('part'), ov = H('div', { class: 'part-full' });
+    root.replaceWith(ph); ov.append(root); document.body.append(ov);
+    btn.textContent = '✕'; btn.title = '關閉全螢幕';
+    ov.addEventListener('pointerdown', (e) => { if (e.target === ov) exitFull(); });
+    SP.partFull = { root, ph, ov, btn };
+    requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+  }
+  function exitFull() {
+    const f = SP.partFull; if (!f) return; SP.partFull = null;
+    if (f.ph.parentNode) f.ph.replaceWith(f.root); else f.root.remove();
+    f.ov.remove(); f.btn.textContent = '⤢'; f.btn.title = '全螢幕';
+    requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+  }
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') exitFull(); });
   function dragger(target, { down, move, up }) {
     target.addEventListener('pointerdown', (e) => { if (e.button !== 0) return; e.preventDefault(); target.setPointerCapture(e.pointerId); if (down(e) === false) { try { target.releasePointerCapture(e.pointerId); } catch (x) { /* 略 */ } } });
     target.addEventListener('pointermove', (e) => { if (target.hasPointerCapture(e.pointerId)) move(e); });
@@ -253,43 +282,24 @@
     }, destroy() { ro.disconnect(); } };
   }
 
-  /* ---------- 主機接口：把零件插上、拔掉、換位置（全部用滑鼠拖） ---------- */
-  const DEVNAME = { motor: '馬達', color: '顏色', distance: '距離', force: '力' };
-  const strip = H('div', { class: 'portstrip' });
-  const socks = {};
-  for (const p of ALL_PORTS) { const hold = H('div', { class: 'hold' }); const sk = H('div', { class: 'sock', 'data-p': p }, H('span', { class: 'sl', text: p }), hold); socks[p] = { sk, hold, t: '' }; strip.append(sk); }
-  const tray = H('div', { class: 'ptray' }, H('span', { class: 'tl', text: '拖到接口插上' }));
-  for (const t of ['motor', 'color', 'distance', 'force']) { const c = H('div', { class: 'pchip ' + t, 'data-t': t, text: DEVNAME[t] }); tray.append(c); chipDrag(c, t, null); }
-  strip.append(tray);
-  function chipDrag(el, type, from) {
-    el.addEventListener('pointerdown', (e) => {
-      if (e.button !== 0) return; e.preventDefault();
-      const ghost = H('div', { class: 'pchip drag ' + type, text: DEVNAME[type] }); document.body.append(ghost);
-      const put = (ev) => { ghost.style.left = ev.clientX + 'px'; ghost.style.top = ev.clientY + 'px'; }; put(e);
-      if (from) el.classList.add('lifted');
-      const move = (ev) => { put(ev); const s = document.elementFromPoint(ev.clientX, ev.clientY), k = s && s.closest('.sock'); for (const q of ALL_PORTS) socks[q].sk.classList.toggle('over', !!k && k.dataset.p === q); };
-      const up = (ev) => {
-        window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up);
-        ghost.remove(); el.classList.remove('lifted'); for (const q of ALL_PORTS) socks[q].sk.classList.remove('over');
-        const s = ev.type === 'pointercancel' ? null : document.elementFromPoint(ev.clientX, ev.clientY), k = s && s.closest('.sock');
-        if (k) { const to = k.dataset.p; if (from) { if (to !== from) { const other = sim.ports[to]; sim.ports[to] = type; sim.ports[from] = other; } } else sim.ports[to] = type; }
-        else if (from) sim.ports[from] = 'none';               // 拖到外面＝拔掉
-        U.refreshPortSelects(); renderStrip();
-      };
-      window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
-    });
-  }
-  function renderStrip() {
-    for (const p of ALL_PORTS) {
-      const t = sim.ports[p], o = socks[p]; if (o.t === t) continue; o.t = t; o.hold.textContent = ''; o.sk.classList.toggle('full', t !== 'none');
-      if (t !== 'none') { const c = H('div', { class: 'pchip ' + t, text: DEVNAME[t] }); o.hold.append(c); chipDrag(c, t, p); }
-    }
+  /* ---------- 接口提示列（接口一律到「接口連接」分頁插拔） ---------- */
+  const DEVNAME = { motor: '馬達', color: '顏色感測器', dist: '距離感測器', force: '力感測器' };
+  const DEVTYPE = { motor: 'motor', color: 'color', dist: 'distance', force: 'force' };
+  const portline = H('div', { class: 'comp-portline' }), plList = H('div', { class: 'pl-list' }), plGo = H('button', { type: 'button', class: 'pl-go', text: '到接口連接改接口 →' });
+  plGo.onclick = () => showView('wire'); portline.append(plList, plGo);
+  let plSig = '';
+  function renderPortline(ids) {
+    const items = ids.map((id) => id.split(':')).filter(([k, p]) => DEVNAME[k] && p).map(([k, p]) => ({ k, p, ok: sim.ports[p] === DEVTYPE[k] }));
+    const sg = items.map((o) => o.k + o.p + o.ok).join('|'); if (sg === plSig) return; plSig = sg;
+    plList.textContent = '';
+    if (!items.length) { plList.append(H('span', { class: 'pl-none', text: '目前程式沒有用到要接在接口上的零件' })); return; }
+    for (const o of items) plList.append(H('span', { class: 'pl-item' + (o.ok ? '' : ' bad') }, H('i', { style: 'background:' + (o.k === 'motor' ? '#0090f5' : '#34ccf1') }), DEVNAME[o.k] + ' ' + o.p + (o.ok ? '' : ' ⚠ 沒接')));
   }
 
   /* ---------- 版面：零件多就分割 ---------- */
   const root = $('tab-comp'), grid = H('div', { class: 'comp-grid' }), empty = H('div', { class: 'comp-empty' }, H('div', {}, H('b', { text: '還沒有用到會動的零件' }), '到左邊拖一個積木過來，例如「馬達 轉動」、「當 力傳感器 被按下」，',
     H('br'), '這裡就會出現對應的零件，可以直接用滑鼠玩。'));
-  root.append(strip, grid, empty);
+  root.append(portline, grid, empty);
   const make = (id) => { const [k, p] = id.split(':'); if (SP.part3d && SP.part3d.ready) { const m3 = SP.part3d.make(k, p); if (m3) return m3; } return k === 'hub' ? hubPart() : k === 'motor' ? motorPart(p) : k === 'color' ? colorPart(p) : k === 'dist' ? distPart(p) : k === 'force' ? forcePart(p) : gyroPart(); };
   let panes = new Map(), sig = '';
   function connect(ids) {
@@ -297,24 +307,62 @@
     for (const id of ids) { if (panes.has(id)) continue; const [k, p] = id.split(':'); const type = { motor: 'motor', color: 'color', dist: 'distance', force: 'force' }[k]; if (type && sim.ports[p] === 'none') { sim.ports[p] = type; changed = true; } }
     if (changed) U.refreshPortSelects();
   }
+  let curN = 0;
+  function setCols() { const W = grid.clientWidth; if (!W) return; grid.style.setProperty('--gw', W + 'px'); grid.style.setProperty('--cols', clamp(Math.floor((W + 12) / 492), 1, Math.max(1, curN))); }
+  new ResizeObserver(setCols).observe(grid);
   function render(ids) {
-    connect(ids);
+    exitFull(); connect(ids);
     for (const [id, pn] of panes) if (!ids.includes(id)) { if (pn.destroy) pn.destroy(); pn.root.remove(); panes.delete(id); }
     for (const id of ids) if (!panes.has(id)) panes.set(id, make(id));
     ids.forEach((id) => grid.append(panes.get(id).root));      // 依官方順序排好
-    grid.className = 'comp-grid n' + Math.min(ids.length, 8); empty.hidden = ids.length > 0; grid.hidden = ids.length === 0;
+    curN = ids.length; grid.className = 'comp-grid n' + Math.min(ids.length, 8); setCols(); empty.hidden = ids.length > 0; grid.hidden = ids.length === 0;
   }
   const orderOf = (id) => { const [k, p] = id.split(':'); return ({ hub: 0, motor: 1, color: 3, dist: 4, force: 5, gyro: 6 }[k] || 9) * 10 + (p ? p.charCodeAt(0) - 64 : 0); };
   function refresh() {
     const ids = [...new Set([...detect(), ...(SP.compForce || [])])].sort((x, y) => orderOf(x) - orderOf(y)), s = ids.join('|');
     const badge = $('comp-badge'); badge.hidden = !ids.length; badge.textContent = ids.length;
-    renderStrip();
+    renderPortline(ids);
     if (s !== sig) { sig = s; render(ids); }
   }
   setInterval(refresh, 300);
 
   /* ---------- 切換：場地模擬 / 元件模擬 ---------- */
   let view = 'field', raf = 0;
+  /* ---------- 右側欄寬度：分隔線拖曳、每個分頁各記一個寬度、「放大」切換 ---------- */
+  const sideEl = document.querySelector('.side'), splitter = $('splitter'), widenBtn = $('btn-widen');
+  const SIDE_MIN = 420, LEFT_MIN = 520;
+  let widen = false;
+  const sideMax = () => Math.max(SIDE_MIN, window.innerWidth - LEFT_MIN);
+  const sideDef = (v) => (v === 'field' ? 500 : Math.max(560, window.innerWidth * 0.5));
+  function sideGet(v) { let w = NaN; try { w = parseFloat(localStorage.getItem('spikesim.sideW.' + v)); } catch (x) { /* 略 */ } if (!(w > 0)) w = sideDef(v); return clamp(w, SIDE_MIN, sideMax()); }
+  function sideSet(v, w) { try { localStorage.setItem('spikesim.sideW.' + v, String(Math.round(w))); } catch (x) { /* 略 */ } }
+  let sideTimer = 0;
+  function sideApply() {
+    if (window.innerWidth < 1100) { sideEl.style.width = ''; return; }
+    sideEl.style.width = Math.round(widen ? sideMax() : sideGet(view)) + 'px';
+    clearTimeout(sideTimer); sideTimer = setTimeout(() => window.dispatchEvent(new Event('resize')), 220);   // 動畫結束後讓 3D 與場地畫布重算
+    window.dispatchEvent(new Event('resize'));
+  }
+  if (widenBtn) widenBtn.onclick = () => { widen = !widen; widenBtn.setAttribute('aria-pressed', widen ? 'true' : 'false'); widenBtn.textContent = widen ? '⤡ 還原' : '⤢ 放大'; sideApply(); };
+  let sdrag = false;
+  if (splitter) {
+    splitter.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return; e.preventDefault(); try { splitter.setPointerCapture(e.pointerId); } catch (x) { /* 略 */ } sdrag = true; splitter.classList.add('on'); sideEl.classList.add('dragging');
+      if (widen && widenBtn) { widen = false; widenBtn.setAttribute('aria-pressed', 'false'); widenBtn.textContent = '⤢ 放大'; }
+    });
+    splitter.addEventListener('pointermove', (e) => {
+      if (!sdrag) return;
+      const w = clamp(window.innerWidth - e.clientX, SIDE_MIN, sideMax()); sideEl.style.width = Math.round(w) + 'px'; window.dispatchEvent(new Event('resize'));
+    });
+    const end = (e) => {
+      if (!sdrag) return; sdrag = false; try { splitter.releasePointerCapture(e.pointerId); } catch (x) { /* 略 */ }
+      splitter.classList.remove('on'); sideEl.classList.remove('dragging'); sideSet(view, sideEl.getBoundingClientRect().width); window.dispatchEvent(new Event('resize'));
+    };
+    splitter.addEventListener('pointerup', end); splitter.addEventListener('pointercancel', end);
+  }
+  window.addEventListener('resize', () => { if (window.innerWidth >= 1100 && !sideEl.classList.contains('dragging')) { const t = sideEl.style.transition; sideEl.style.transition = 'none'; const w = Math.round(widen ? sideMax() : sideGet(view)); if (sideEl.style.width !== w + 'px') sideEl.style.width = w + 'px'; sideEl.style.transition = t; } else if (window.innerWidth < 1100) sideEl.style.width = ''; });
+
+
   function applyHand() {
     sim.hand.color = state.hover || state.brick || 'none'; sim.hand.dist = state.dist; sim.hand.force = state.force;
   }
@@ -324,7 +372,7 @@
     raf = requestAnimationFrame(loop);
   }
   function showView(v) {
-    if (v === view) return; view = v;
+    if (v === view) return; view = v; sideApply();
     document.querySelectorAll('#viewtabs button[data-view]').forEach((b) => b.classList.toggle('on', b.dataset.view === v));
     $('tab-field').hidden = v !== 'field'; root.hidden = v !== 'comp'; const tw = $('tab-wire'); if (tw) tw.hidden = v !== 'wire';
     if (SP.wire) { if (v === 'wire') SP.wire.show(); else SP.wire.hide(); }
@@ -340,6 +388,6 @@
   SP.showView = showView; SP.compParts = () => [...panes.keys()];
   refresh();
   // 3D 零件模型載入完成：把已經建好的平面版零件換成 3D 版
-  window.addEventListener('sp-part3d-ready', () => { for (const [, pn] of panes) { if (pn.destroy) pn.destroy(); pn.root.remove(); } panes.clear(); sig = ''; refresh(); });
+  window.addEventListener('sp-part3d-ready', () => { exitFull(); for (const [, pn] of panes) { if (pn.destroy) pn.destroy(); pn.root.remove(); } panes.clear(); sig = ''; refresh(); });
   SP.compKit = { H, S, sim, U, api, state, frame, COLOR_HEX, COLOR_ZH, COLOR_NUM, FACE, clamp, rad };
 })(window.SP = window.SP || {});
